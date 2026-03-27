@@ -1,6 +1,11 @@
 import datetime as dt
 import os
+import sys
 from io import BytesIO
+
+# Ensure the backend directory is on the path so `services.*` can be imported
+# whether the app is run locally (from backend/) or via Streamlit Cloud (from repo root).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
 from dotenv import load_dotenv
