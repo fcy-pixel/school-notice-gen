@@ -16,6 +16,22 @@ from services.docx_service import (
 
 load_dotenv()
 
+# Streamlit Cloud deploy: map secrets to env vars expected by backend services.
+try:
+    for secret_key in [
+        "QWEN_API_KEY",
+        "QWEN_BASE_URL",
+        "QWEN_MODEL",
+        "OPENAI_API_KEY",
+        "OPENAI_BASE_URL",
+        "OPENAI_MODEL",
+    ]:
+        if secret_key in st.secrets and str(st.secrets[secret_key]).strip():
+            os.environ[secret_key] = str(st.secrets[secret_key]).strip()
+except Exception:
+    # Local run without Streamlit secrets file.
+    pass
+
 st.set_page_config(page_title="學校自動出通告", page_icon="📝", layout="wide")
 
 st.title("學校自動出通告系統（香港）")
