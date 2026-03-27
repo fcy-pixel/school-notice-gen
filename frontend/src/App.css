@@ -1,0 +1,178 @@
+.page {
+  width: min(1040px, 100%);
+  margin: 0 auto;
+  padding: 28px 16px 44px;
+  display: grid;
+  gap: 18px;
+}
+
+.hero {
+  background: linear-gradient(120deg, #073b4c, #0b6e4f);
+  color: #f4f6e9;
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 12px 34px rgba(7, 59, 76, 0.28);
+  animation: rise-in 450ms ease-out;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+}
+
+.subtitle {
+  margin: 10px 0 0;
+  max-width: 56ch;
+  line-height: 1.5;
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #d3ded9;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 8px 20px rgba(5, 48, 50, 0.08);
+}
+
+.panel h2 {
+  margin: 0 0 14px;
+  color: #173e43;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.inline-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.grid-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field span {
+  font-size: 0.88rem;
+  color: #2b4f56;
+}
+
+.full {
+  grid-column: 1 / -1;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid #bfd0c8;
+  padding: 10px 12px;
+  background: #fff;
+  color: #102f34;
+}
+
+textarea {
+  resize: vertical;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #ff7b00, #e85d04);
+  color: #fff9ef;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: transform 160ms ease, filter 160ms ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+button:disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.hint {
+  margin: 0;
+  color: #42636c;
+}
+
+.status {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff6e7;
+  border: 1px solid #f4d4a5;
+  color: #7a4b12;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 760px) {
+  .grid-form {
+    grid-template-columns: 1fr;
+  }
+
+  .page {
+    padding-inline: 10px;
+  }
+
+  .hero,
+  .panel {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .actions {
+    justify-content: stretch;
+  }
+
+  .actions button {
+    width: 100%;
+  }
+}
