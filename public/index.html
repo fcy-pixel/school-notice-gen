@@ -172,11 +172,6 @@ html,body{height:100%;font-family:"Microsoft JhengHei","Noto Sans TC",system-ui,
     <h1>學校通告<br>生成器</h1>
   </div>
 
-  <div>
-    <div class="sb-label">學校名稱</div>
-    <input class="sb-input" id="schoolName" value="中華基督教會基慈小學">
-  </div>
-
   <button class="reset-btn" onclick="resetChat()">🔄 重新開始</button>
 
   <div class="sb-footer">中華基督教會基慈小學<br>學校行政工具</div>
@@ -256,7 +251,7 @@ async function doSend(text) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages: state.messages,
-        school_name: document.getElementById('schoolName').value.trim() || '中華基督教會基慈小學',
+        school_name: '中華基督教會基慈小學',
       }),
     });
     const data = await res.json();
@@ -376,7 +371,7 @@ async function downloadDocx() {
       '學年':    document.getElementById('nc-sy').value,
       '通告編號':document.getElementById('nc-no').value,
       '發出日期':document.getElementById('nc-date').value,
-      schoolName:document.getElementById('schoolName').value || '中華基督教會基慈小學',
+      schoolName:'中華基督教會基慈小學',
     };
     const res = await fetch('/api/generate-notice', {
       method:'POST', headers:{'Content-Type':'application/json'},
