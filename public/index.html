@@ -42,14 +42,7 @@ html,body{height:100%;font-family:"Microsoft JhengHei","Noto Sans TC",system-ui,
   transition:background .15s;
 }
 .reset-btn:hover{background:rgba(255,255,255,.2)}
-.sb-mode{display:flex;gap:6px;flex-wrap:wrap}
-.mode-btn{
-  font:inherit;font-size:.78rem;cursor:pointer;
-  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);
-  border-radius:99px;color:rgba(255,255,255,.8);padding:5px 10px;
-  transition:background .15s,color .15s;
-}
-.mode-btn.active,.mode-btn:hover{background:rgba(255,255,255,.22);color:#fff}
+
 .sb-footer{margin-top:auto;font-size:.7rem;opacity:.4;line-height:1.7}
 
 /* ── Chat main ── */
@@ -154,11 +147,7 @@ html,body{height:100%;font-family:"Microsoft JhengHei","Noto Sans TC",system-ui,
 .spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* ── Form mode (hidden by default) ── */
-#formMode{display:none;flex:1;overflow-y:auto;padding:16px}
-#formMode.active{display:block}
 #chatMode{display:flex;flex-direction:column;flex:1;overflow:hidden}
-#chatMode.hidden{display:none}
 
 /* ── Responsive ── */
 @media(max-width:640px){
@@ -188,14 +177,6 @@ html,body{height:100%;font-family:"Microsoft JhengHei","Noto Sans TC",system-ui,
     <input class="sb-input" id="schoolName" value="中華基督教會基慈小學">
   </div>
 
-  <div>
-    <div class="sb-label">模式</div>
-    <div class="sb-mode">
-      <button class="mode-btn active" id="btnChat" onclick="switchMode('chat')">💬 助手</button>
-      <button class="mode-btn" id="btnForm" onclick="switchMode('form')">📋 表格</button>
-    </div>
-  </div>
-
   <button class="reset-btn" onclick="resetChat()">🔄 重新開始</button>
 
   <div class="sb-footer">中華基督教會基慈小學<br>學校行政工具</div>
@@ -213,12 +194,6 @@ html,body{height:100%;font-family:"Microsoft JhengHei","Noto Sans TC",system-ui,
       onkeydown="handleKey(event)"></textarea>
     <button type="submit" class="send-btn" id="sendBtn" disabled>➤</button>
   </form>
-</div>
-
-<!-- ── Form mode ─────────────────────────────────────────────── -->
-<div id="formMode">
-  <!-- Injected from original form content below -->
-  <div id="formContent"></div>
 </div>
 
 </div>
@@ -240,20 +215,11 @@ document.addEventListener('DOMContentLoaded', () => {
   addBotMsg(WELCOME);
   setChips(NOTICE_TYPES);
   document.getElementById('chatIn').addEventListener('input', onInputChange);
-  loadFormContent();
 });
 
 function onInputChange() {
   const v = document.getElementById('chatIn').value.trim();
   document.getElementById('sendBtn').disabled = !v || state.loading;
-}
-
-// ── Mode switch ────────────────────────────────────────────────
-function switchMode(mode) {
-  document.getElementById('chatMode').classList.toggle('hidden', mode !== 'chat');
-  document.getElementById('formMode').classList.toggle('active', mode === 'form');
-  document.getElementById('btnChat').classList.toggle('active', mode === 'chat');
-  document.getElementById('btnForm').classList.toggle('active', mode === 'form');
 }
 
 // ── Chat ───────────────────────────────────────────────────────
@@ -465,16 +431,7 @@ function toast(msg, type='') {
   clearTimeout(t._t); t._t = setTimeout(()=>t.className='', 3000);
 }
 
-// ── Load original form ─────────────────────────────────────────
-function loadFormContent() {
-  document.getElementById('formContent').innerHTML = FORM_HTML;
-  // Re-attach scripts
-  const s = document.createElement('script');
-  s.textContent = FORM_SCRIPT;
-  document.getElementById('formContent').appendChild(s);
-}
-
-// Original form HTML (activity notice form)
+// ── (form removed) ────────────────────────────────────────────
 const FORM_HTML = `
 <style>
 #formContent{max-width:800px;margin:0 auto;padding:0 0 60px}
