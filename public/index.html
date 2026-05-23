@@ -134,6 +134,32 @@ html,body{height:100%;font-family:"Microsoft JhengHei","Noto Sans TC",system-ui,
 .btn-ghost{background:transparent;border:1.5px solid var(--border);color:var(--muted)}
 .btn-ghost:hover{background:var(--bg)}
 
+/* ── Attachment area ── */
+.attach-area{display:flex;flex-wrap:wrap;gap:6px;padding:4px 14px 2px}
+.attach-area:empty{display:none}
+.file-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 8px;border-radius:99px;font-size:.78rem;border:1px solid;
+}
+.file-chip .fc-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.file-chip .fc-rm{
+  background:none;border:none;cursor:pointer;padding:0 0 0 2px;
+  font-size:.8rem;line-height:1;opacity:.6;
+}
+.file-chip .fc-rm:hover{opacity:1}
+.file-chip.fc-text{background:#e0f2ef;border-color:#0f766e;color:#0f766e}
+.file-chip.fc-img{background:#fdf4ff;border-color:#9333ea;color:#7e22ce}
+.file-chip.fc-loading{background:#f0f9ff;border-color:#0ea5e9;color:#0284c7}
+.file-chip.fc-error{background:#fef2f2;border-color:#dc2626;color:#b91c1c}
+.attach-btn{
+  width:36px;height:36px;align-self:flex-end;flex-shrink:0;margin-bottom:2px;
+  background:none;border:1.5px solid var(--border);border-radius:50%;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:1rem;color:var(--muted);transition:border-color .13s,color .13s;
+}
+.attach-btn:hover{border-color:var(--green);color:var(--green)}
+.attach-btn:disabled{opacity:.4;cursor:not-allowed}
+
 /* ── Toast ── */
 #toast{
   position:fixed;bottom:20px;right:20px;
@@ -239,7 +265,15 @@ html,body{height:100%;font-family:"Microsoft JhengHei","Noto Sans TC",system-ui,
 
   <div class="chips" id="chips"></div>
 
+  <div class="attach-area" id="attachArea"></div>
+
   <form class="input-bar" id="chatForm" onsubmit="sendMsg(event)">
+    <input type="file" id="fileInput" multiple
+      accept=".pdf,.txt,.png,.jpg,.jpeg,.gif,.webp"
+      style="display:none" onchange="onFileSelected(this)">
+    <button type="button" class="attach-btn" id="attachBtn"
+      title="附加檔案（PDF、圖片、TXT）"
+      onclick="document.getElementById('fileInput').click()">&#128206;</button>
     <textarea class="chat-in" id="chatIn" rows="1"
       placeholder="輸入訊息⋯⋯（Enter 發送，Shift+Enter 換行）"
       onkeydown="handleKey(event)"></textarea>
@@ -380,6 +414,7 @@ authInit();
 // ── State ──────────────────────────────────────────────────────
 const state = {
   messages: [],
+  attachments: [], // [{name, category:'text'|'image', content, status:'loading'|'ready'|'error'}]
   notice: null,
   loading: false,
 };
@@ -396,7 +431,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function onInputChange() {
   const v = document.getElementById('chatIn').value.trim();
-  document.getElementById('sendBtn').disabled = !v || state.loading;
+  const hasReady = state.attachments.some(a => a.status === 'ready');
+  document.getElementById('sendBtn').disabled = (!v && !hasReady) || state.loading;
 }
 
 // ── Chat ───────────────────────────────────────────────────────
@@ -404,7 +440,8 @@ function sendMsg(e) {
   if (e) e.preventDefault();
   const inp = document.getElementById('chatIn');
   const text = inp.value.trim();
-  if (!text || state.loading) return;
+  const hasReady = state.attachments.some(a => a.status === 'ready');
+  if ((!text && !hasReady) || state.loading) return;
   inp.value = '';
   onInputChange();
   doSend(text);
@@ -415,26 +452,48 @@ function handleKey(e) {
 }
 
 async function doSend(text) {
-  addUserMsg(text);
+  const readyAtts = state.attachments.filter(a => a.status === 'ready');
+  const textAtts  = readyAtts.filter(a => a.category === 'text');
+  const imageAtts = readyAtts.filter(a => a.category === 'image');
+
+  // Build API message text (includes extracted PDF/TXT content)
+  let apiText = text;
+  for (const att of textAtts) {
+    const preview = att.content.length > 4000
+      ? att.content.slice(0, 4000) + '\n…（內容已截短）'
+      : att.content;
+    apiText += '\n\n【附件「' + att.name + '」】\n' + '─'.repeat(16) + '\n' + preview + '\n' + '─'.repeat(16);
+  }
+  if (imageAtts.length) apiText += '\n\n[已附上圖片：' + imageAtts.map(a => a.name).join(', ') + ']';
+
+  // Show in chat (text + image thumbnails)
+  addUserMsgRich(text, imageAtts);
   setChips([]);
-  state.messages.push({ role: 'user', content: text });
+  state.messages.push({ role: 'user', content: apiText });
   state.notice = null;
 
-  // Remove old notice preview if any
+  const sentImages = imageAtts.map(a => a.content); // base64 data URLs
+  state.attachments = [];
+  renderAttachments();
+
   document.querySelectorAll('.notice-card').forEach(el => el.remove());
 
   const typingId = addTyping();
   state.loading = true;
   document.getElementById('sendBtn').disabled = true;
+  document.getElementById('attachBtn').disabled = true;
 
   try {
+    const body = {
+      messages: state.messages,
+      school_name: '中華基督教會基慈小學',
+    };
+    if (sentImages.length) body.images = sentImages;
+
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: state.messages,
-        school_name: '中華基督教會基慈小學',
-      }),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || '發生錯誤');
@@ -454,6 +513,7 @@ async function doSend(text) {
   } finally {
     state.loading = false;
     onInputChange();
+    document.getElementById('attachBtn').disabled = false;
     document.getElementById('chatIn').focus();
   }
 }
@@ -468,6 +528,21 @@ function addBotMsg(text) {
 }
 function addUserMsg(text) {
   const row = msgRow('user', esc(text));
+  document.getElementById('msgs').appendChild(row);
+  scrollBottom();
+}
+function addUserMsgRich(text, imageAtts = []) {
+  let html = '';
+  if (imageAtts.length) {
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">';
+    imageAtts.forEach(a => {
+      html += '<img src="' + a.content + '" style="max-height:90px;max-width:140px;border-radius:8px;object-fit:cover" alt="' + esc(a.name) + '">';
+    });
+    html += '</div>';
+  }
+  if (text) html += esc(text);
+  if (!html) html = esc(imageAtts.map(a => a.name).join(', '));
+  const row = msgRow('user', html);
   document.getElementById('msgs').appendChild(row);
   scrollBottom();
 }
@@ -587,6 +662,8 @@ function copyNotice() {
 function resetChat() {
   state.messages = [];
   state.notice = null;
+  state.attachments = [];
+  renderAttachments();
   document.getElementById('msgs').innerHTML = '';
   document.getElementById('chips').innerHTML = '';
   addBotMsg(WELCOME);
@@ -594,7 +671,85 @@ function resetChat() {
   document.getElementById('chatIn').value = '';
   onInputChange();
 }
-
+// ── Attachments ──────────────────────────────────────────
+const MAX_FILE_MB = 10;
+async function onFileSelected(inp) {
+  const files = Array.from(inp.files);
+  inp.value = '';
+  for (const file of files) {
+    const idx = state.attachments.length;
+    state.attachments.push({ name: file.name, category: null, content: null, status: 'loading' });
+    renderAttachments();
+    try {
+      const result = await processFile(file);
+      state.attachments[idx] = { ...result, status: 'ready' };
+    } catch (err) {
+      state.attachments[idx] = { name: file.name, category: 'error', content: '', status: 'error', errMsg: err.message };
+      toast('❌ ' + file.name + '：' + err.message, 'err');
+    }
+    renderAttachments();
+  }
+}
+async function processFile(file) {
+  if (file.size > MAX_FILE_MB * 1024 * 1024) throw new Error('檔案不可超過 ' + MAX_FILE_MB + ' MB');
+  const ext = file.name.split('.').pop().toLowerCase();
+  const imgExts = ['png','jpg','jpeg','gif','webp'];
+  if (ext === 'pdf') {
+    const text = await extractPdfText(file);
+    if (!text.trim()) throw new Error('無法從 PDF 提取文字');
+    return { name: file.name, category: 'text', content: text };
+  }
+  if (ext === 'txt') {
+    const text = await file.text();
+    return { name: file.name, category: 'text', content: text };
+  }
+  if (imgExts.includes(ext)) {
+    const dataUrl = await fileToDataUrl(file);
+    return { name: file.name, category: 'image', content: dataUrl };
+  }
+  throw new Error('不支援的檔案類型（支援：PDF、TXT、圖片）');
+}
+async function extractPdfText(file) {
+  if (typeof pdfjsLib === 'undefined') throw new Error('PDF.js 未載入');
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const ab = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const c = await page.getTextContent();
+    text += c.items.map(x => x.str).join(' ') + '\n';
+  }
+  return text.trim();
+}
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('檔案讀取失敗'));
+    r.readAsDataURL(file);
+  });
+}
+function renderAttachments() {
+  const area = document.getElementById('attachArea');
+  area.innerHTML = '';
+  state.attachments.forEach((a, i) => {
+    const icon = a.status === 'loading' ? '⏳' : a.status === 'error' ? '⚠️' : a.category === 'image' ? '🖼️' : '📄';
+    const cls  = a.status === 'loading' ? 'fc-loading' : a.status === 'error' ? 'fc-error' : a.category === 'image' ? 'fc-img' : 'fc-text';
+    const chip = document.createElement('div');
+    chip.className = 'file-chip ' + cls;
+    chip.title = a.status === 'error' ? (a.errMsg || '錯誤') : a.name;
+    chip.innerHTML = icon + ' <span class="fc-name">' + esc(a.name) + '</span>' +
+      (a.status !== 'loading' ? '<button class="fc-rm" onclick="removeAttachment(' + i + ')">✕</button>' : '');
+    area.appendChild(chip);
+  });
+  onInputChange();
+}
+function removeAttachment(i) {
+  state.attachments.splice(i, 1);
+  renderAttachments();
+}
 // ── Helpers ────────────────────────────────────────────────────
 function esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

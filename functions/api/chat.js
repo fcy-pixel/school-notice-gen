@@ -2,13 +2,13 @@ import { runChat } from '../../src/chatService.js';
 
 export async function onRequestPost({ request, env }) {
   try {
-    const { messages, school_name: schoolName = '中華基督教會基慈小學' } = await request.json();
+    const { messages, school_name: schoolName = '中華基督教會基慈小學', images } = await request.json();
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return jsonError('messages 不可為空', 400);
     }
 
-    const result = await runChat(messages, schoolName, env);
+    const result = await runChat(messages, schoolName, env, images);
 
     return new Response(JSON.stringify(result), {
       headers: corsHeaders(),

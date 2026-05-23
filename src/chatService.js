@@ -56,10 +56,11 @@ const CHAT_SYSTEM_PROMPT = `你係「通告小幫手」，協助香港學校生�
  * @param {object} env - Cloudflare Worker env bindings
  * @returns {Promise<{reply:string, status:string, notice?:object, suggestedReplies:string[]}>}
  */
-export async function runChat(messages, schoolName, env) {
-  const apiKey  = env.QWEN_API_KEY;
-  const baseUrl = env.QWEN_BASE_URL || 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
-  const model   = env.QWEN_MODEL   || 'qwen-plus';
+export async function runChat(messages, schoolName, env, images = []) {
+  const apiKey      = env.QWEN_API_KEY;
+  const baseUrl     = env.QWEN_BASE_URL     || 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
+  const textModel   = env.QWEN_MODEL        || 'qwen-plus';
+  const visionModel = env.QWEN_VISION_MODEL || 'qwen-vl-plus';
 
   if (!apiKey) throw new Error('QWEN_API_KEY 未設定');
 
@@ -70,12 +71,34 @@ export async function runChat(messages, schoolName, env) {
   const systemContent = CHAT_SYSTEM_PROMPT
     + `\n\n今日日期：${today}\n學校名稱：${schoolName}`;
 
-  const payload = {
-    model,
-    messages: [
+  const hasImages = Array.isArray(images) && images.length > 0;
+  const model = hasImages ? visionModel : textModel;
+
+  // For vision: wrap last user message as content array with image_url entries
+  let apiChatMessages;
+  if (hasImages) {
+    const lastMsg = messages[messages.length - 1];
+    apiChatMessages = [
+      { role: 'system', content: systemContent },
+      ...messages.slice(0, -1),
+      {
+        role: 'user',
+        content: [
+          ...images.map(url => ({ type: 'image_url', image_url: { url } })),
+          { type: 'text', text: lastMsg.content },
+        ],
+      },
+    ];
+  } else {
+    apiChatMessages = [
       { role: 'system', content: systemContent },
       ...messages,
-    ],
+    ];
+  }
+
+  const payload = {
+    model,
+    messages: apiChatMessages,
     temperature: 0.7,
   };
 
@@ -107,7 +130,7 @@ export async function runChat(messages, schoolName, env) {
     }
 
     // Call Qwen again to generate the formatted notice text
-    const notice = await generateNoticeText(genData, schoolName, apiKey, baseUrl, model);
+    const notice = await generateNoticeText(genData, schoolName, apiKey, baseUrl, textModel);
     return {
       reply: cleanReply,
       status: 'generated',
