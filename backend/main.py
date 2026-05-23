@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import templates, generate, export
+from routers import templates, generate, export, chat
 
 load_dotenv()
 
@@ -19,6 +19,7 @@ app.add_middleware(
 app.include_router(templates.router, prefix="/templates", tags=["範本管理"])
 app.include_router(generate.router, prefix="/generate", tags=["AI 生成"])
 app.include_router(export.router, prefix="/export", tags=["輸出 Word"])
+app.include_router(chat.router, prefix="/chat", tags=["Chatbot 通告助手"])
 
 
 @app.get("/")

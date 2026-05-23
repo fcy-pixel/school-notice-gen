@@ -1,189 +1,165 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
-type TemplateItem = {
-  id: string
-  name: string
+const API_BASE = 'http://localhost:8000'
+
+// ── Types ──────────────────────────────────────────────────────────
+type Role = 'user' | 'assistant'
+
+interface Message {
+  id: number
+  role: Role
+  content: string
+  isTyping?: boolean
 }
 
-type NoticeResult = {
+interface Notice {
   title: string
   recipient: string
   body: string
   closing: string
 }
 
-const API_BASE = 'http://localhost:8000'
+// ── Constants ──────────────────────────────────────────────────────
+const WELCOME_MESSAGE: Message = {
+  id: 0,
+  role: 'assistant',
+  content:
+    '你好！👋 我係**通告小幫手**，幫你快速生成香港學校通告。\n\n你今次想出邊種通告呢？',
+}
 
-function App() {
+const NOTICE_TYPE_CHIPS = [
+  '活動通告',
+  '家長通告',
+  '考試測驗通知',
+  '繳費通知',
+  '緊急通告',
+  '其他通告',
+]
+
+// ── Helpers ────────────────────────────────────────────────────────
+let _msgId = 1
+const nextId = () => _msgId++
+
+/** 把 **粗體** 轉成 <strong>，換行轉 <br> */
+function renderMarkdown(text: string) {
+  const html = text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>')
+  return { __html: html }
+}
+
+interface TemplateItem {
+  id: string
+  name: string
+}
+
+// ── App ────────────────────────────────────────────────────────────
+export default function App() {
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE])
+  const [input, setInput] = useState('')
+  const [chips, setChips] = useState<string[]>(NOTICE_TYPE_CHIPS)
+  const [loading, setLoading] = useState(false)
+
+  const [schoolName, setSchoolName] = useState('中華基督教會基慈小學')
   const [templates, setTemplates] = useState<TemplateItem[]>([])
   const [templateId, setTemplateId] = useState('')
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
 
-  const [noticeTypes, setNoticeTypes] = useState<string[]>([])
-  const [noticeType, setNoticeType] = useState('')
-  const [fields, setFields] = useState<string[]>([])
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
+  const [notice, setNotice] = useState<Notice | null>(null)
+  const [exportLoading, setExportLoading] = useState(false)
+  const [statusMsg, setStatusMsg] = useState('')
 
-  const [schoolName, setSchoolName] = useState('香港示範學校')
-  const [extraInstructions, setExtraInstructions] = useState('')
-  const [notice, setNotice] = useState<NoticeResult | null>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
-
-  const isReadyToGenerate = useMemo(() => {
-    return Boolean(templateId && noticeType && schoolName.trim())
-  }, [templateId, noticeType, schoolName])
-
+  // Load templates on mount
   useEffect(() => {
-    void loadTemplates()
-    void loadTypes()
+    fetch(`${API_BASE}/templates/`)
+      .then((r) => r.json())
+      .then((d: { templates: TemplateItem[] }) => {
+        setTemplates(d.templates)
+        if (d.templates.length > 0) setTemplateId(d.templates[0].id)
+      })
+      .catch(() => {})
   }, [])
 
+  // Auto-scroll to bottom
   useEffect(() => {
-    if (!noticeType) {
-      setFields([])
-      return
-    }
-    void loadFields(noticeType)
-  }, [noticeType])
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, notice])
 
-  const loadTemplates = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/templates/`)
-      const data = (await res.json()) as { templates: TemplateItem[] }
-      setTemplates(data.templates)
-      if (data.templates.length > 0 && !templateId) {
-        setTemplateId(data.templates[0].id)
-      }
-    } catch {
-      setMessage('無法載入範本清單，請確認後端已啟動。')
-    }
-  }
+  // ── Send message ────────────────────────────────────────────────
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || loading) return
 
-  const loadTypes = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/generate/types`)
-      const data = (await res.json()) as { types: string[] }
-      setNoticeTypes(data.types)
-      if (data.types.length > 0) {
-        setNoticeType(data.types[0])
-      }
-    } catch {
-      setMessage('無法載入通告類型。')
-    }
-  }
+    const userMsg: Message = { id: nextId(), role: 'user', content: text }
+    const typingMsg: Message = { id: nextId(), role: 'assistant', content: '', isTyping: true }
 
-  const loadFields = async (type: string) => {
-    try {
-      const res = await fetch(`${API_BASE}/generate/fields/${encodeURIComponent(type)}`)
-      const data = (await res.json()) as { fields: string[] }
-      setFields(data.fields)
-      const nextValues: Record<string, string> = {}
-      for (const key of data.fields) {
-        nextValues[key] = fieldValues[key] ?? ''
-      }
-      setFieldValues(nextValues)
-    } catch {
-      setMessage('無法載入欄位設定。')
-    }
-  }
-
-  const handleUploadTemplate = async (event: FormEvent) => {
-    event.preventDefault()
-    if (!uploadFile) {
-      setMessage('請先選擇 .docx 範本。')
-      return
-    }
-
-    const form = new FormData()
-    form.append('file', uploadFile)
-
+    setMessages((prev) => [...prev, userMsg, typingMsg])
+    setInput('')
+    setChips([])
     setLoading(true)
-    setMessage('')
-    try {
-      const res = await fetch(`${API_BASE}/templates/upload`, {
-        method: 'POST',
-        body: form,
-      })
-      const data = (await res.json()) as { detail?: string }
-      if (!res.ok) {
-        throw new Error(data.detail ?? '上傳失敗')
-      }
-      setUploadFile(null)
-      setMessage('範本上傳成功。')
-      await loadTemplates()
-    } catch (error) {
-      const err = error as Error
-      setMessage(`範本上傳失敗：${err.message}`)
-    } finally {
-      setLoading(false)
-    }
-  }
+    setNotice(null)
 
-  const handleCreateDefaultTemplate = async () => {
-    setLoading(true)
-    setMessage('')
-    try {
-      const res = await fetch(`${API_BASE}/templates/create-default`, { method: 'POST' })
-      const data = (await res.json()) as { detail?: string }
-      if (!res.ok) {
-        throw new Error(data.detail ?? '建立預設範本失敗')
-      }
-      await loadTemplates()
-      setMessage('已建立預設範本。')
-    } catch (error) {
-      const err = error as Error
-      setMessage(`建立預設範本失敗：${err.message}`)
-    } finally {
-      setLoading(false)
-    }
-  }
+    // Build history for API (exclude typing placeholder)
+    const history = [...messages, userMsg]
+      .filter((m) => !m.isTyping)
+      .map((m) => ({ role: m.role, content: m.content }))
 
-  const handleGenerate = async (event: FormEvent) => {
-    event.preventDefault()
-    if (!isReadyToGenerate) {
-      setMessage('請先完成範本、學校名稱與通告類型設定。')
-      return
-    }
-
-    setLoading(true)
-    setMessage('')
     try {
-      const res = await fetch(`${API_BASE}/generate/`, {
+      const res = await fetch(`${API_BASE}/chat/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          notice_type: noticeType,
-          school_name: schoolName,
-          fields: fieldValues,
-          extra_instructions: extraInstructions,
-        }),
+        body: JSON.stringify({ messages: history, school_name: schoolName }),
       })
-      const data = (await res.json()) as { detail?: string; notice?: NoticeResult }
-      if (!res.ok || !data.notice) {
-        throw new Error(data.detail ?? 'AI 生成失敗')
+      const data = (await res.json()) as {
+        reply: string
+        status: string
+        notice?: Notice
+        suggested_replies?: string[]
+        detail?: string
       }
-      setNotice(data.notice)
-      setMessage('通告草稿已生成，可先編輯再匯出 Word。')
-    } catch (error) {
-      const err = error as Error
-      setMessage(`AI 生成失敗：${err.message}`)
+
+      if (!res.ok) throw new Error(data.detail ?? '發生錯誤')
+
+      const assistantMsg: Message = { id: nextId(), role: 'assistant', content: data.reply }
+      setMessages((prev) => [...prev.filter((m) => !m.isTyping), assistantMsg])
+
+      if (data.status === 'generated' && data.notice) {
+        setNotice(data.notice)
+      }
+      setChips(data.suggested_replies ?? [])
+    } catch (err) {
+      const errMsg: Message = {
+        id: nextId(),
+        role: 'assistant',
+        content: `❌ 出錯了：${(err as Error).message}`,
+      }
+      setMessages((prev) => [...prev.filter((m) => !m.isTyping), errMsg])
     } finally {
       setLoading(false)
+      inputRef.current?.focus()
     }
   }
 
+  // ── Reset chat ──────────────────────────────────────────────────
+  const handleReset = () => {
+    setMessages([WELCOME_MESSAGE])
+    setChips(NOTICE_TYPE_CHIPS)
+    setNotice(null)
+    setInput('')
+    setStatusMsg('')
+    inputRef.current?.focus()
+  }
+
+  // ── Export Word ─────────────────────────────────────────────────
   const handleExport = async () => {
     if (!notice || !templateId) {
-      setMessage('請先生成通告內容並選擇範本。')
+      setStatusMsg('請先選擇範本，再下載通告。')
       return
     }
-
-    setLoading(true)
-    setMessage('')
+    setExportLoading(true)
+    setStatusMsg('')
     try {
       const today = new Date().toISOString().slice(0, 10)
       const res = await fetch(`${API_BASE}/export/`, {
@@ -199,164 +175,181 @@ function App() {
           date: today,
         }),
       })
-
       if (!res.ok) {
         const err = (await res.json()) as { detail?: string }
         throw new Error(err.detail ?? '匯出失敗')
       }
-
       const blob = await res.blob()
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       link.download = `${notice.title || '通告'}.docx`
       link.click()
       URL.revokeObjectURL(link.href)
-      setMessage('Word 檔案已下載。')
-    } catch (error) {
-      const err = error as Error
-      setMessage(`Word 匯出失敗：${err.message}`)
+      setStatusMsg('✅ Word 檔案已下載。')
+    } catch (err) {
+      setStatusMsg(`❌ 匯出失敗：${(err as Error).message}`)
     } finally {
-      setLoading(false)
+      setExportLoading(false)
     }
   }
 
-  const updateNoticeField = (key: keyof NoticeResult, value: string) => {
+  const updateNotice = (key: keyof Notice, value: string) => {
     if (!notice) return
     setNotice({ ...notice, [key]: value })
   }
 
+  // ── Render ──────────────────────────────────────────────────────
   return (
-    <main className="page">
-      <header className="hero">
-        <p className="eyebrow">香港學校行政工具</p>
-        <h1>學校自動出通告系統</h1>
-        <p className="subtitle">上傳既有 Word 範本，AI 生成繁體中文通告，直接下載 .docx。</p>
-      </header>
-
-      <section className="panel">
-        <h2>1. 範本管理</h2>
-        <div className="row">
-          <form onSubmit={handleUploadTemplate} className="inline-form">
-            <input
-              type="file"
-              accept=".docx"
-              onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-            />
-            <button disabled={loading} type="submit">上傳範本</button>
-          </form>
-          <button disabled={loading} onClick={handleCreateDefaultTemplate} type="button">
-            建立預設範本
-          </button>
+    <div className="app-layout">
+      {/* ── Sidebar ─────────────────────────────────────────────── */}
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <img src="/logo.png" alt="校徽" className="school-logo" />
+          <h1 className="app-title">學校通告<br />生成器</h1>
         </div>
-        <label className="field">
-          <span>選擇範本</span>
-          <select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-            <option value="">請選擇</option>
-            {templates.map((tpl) => (
-              <option key={tpl.id} value={tpl.id}>
-                {tpl.name}
+
+        <div className="sidebar-section">
+          <label className="sidebar-label">學校名稱</label>
+          <input
+            className="sidebar-input"
+            value={schoolName}
+            onChange={(e) => setSchoolName(e.target.value)}
+          />
+        </div>
+
+        <div className="sidebar-section">
+          <label className="sidebar-label">Word 範本</label>
+          <select
+            className="sidebar-input"
+            value={templateId}
+            onChange={(e) => setTemplateId(e.target.value)}
+          >
+            <option value="">（未選擇）</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
               </option>
             ))}
           </select>
-        </label>
-      </section>
+          {templates.length === 0 && (
+            <p className="sidebar-hint">後端未啟動或無範本</p>
+          )}
+        </div>
 
-      <section className="panel">
-        <h2>2. 生成通告內容</h2>
-        <form onSubmit={handleGenerate} className="grid-form">
-          <label className="field">
-            <span>學校名稱</span>
-            <input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} />
-          </label>
+        <button className="reset-btn" onClick={handleReset}>
+          🔄 重新開始
+        </button>
 
-          <label className="field">
-            <span>通告類型</span>
-            <select value={noticeType} onChange={(e) => setNoticeType(e.target.value)}>
-              {noticeTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="sidebar-footer">
+          <p>中華基督教會基慈小學</p>
+          <p>學校行政工具</p>
+        </div>
+      </aside>
 
-          {fields.map((field) => (
-            <label key={field} className="field">
-              <span>{field}</span>
-              <input
-                value={fieldValues[field] ?? ''}
-                onChange={(e) => setFieldValues({ ...fieldValues, [field]: e.target.value })}
-              />
-            </label>
+      {/* ── Main ────────────────────────────────────────────────── */}
+      <main className="chat-main">
+        {/* Messages */}
+        <div className="messages-area">
+          {messages.map((msg) => (
+            <div key={msg.id} className={`msg-row ${msg.role}`}>
+              {msg.role === 'assistant' && (
+                <div className="avatar">🤖</div>
+              )}
+              <div className={`bubble ${msg.role}${msg.isTyping ? ' typing' : ''}`}>
+                {msg.isTyping ? (
+                  <span className="dots"><span /><span /><span /></span>
+                ) : (
+                  <span dangerouslySetInnerHTML={renderMarkdown(msg.content)} />
+                )}
+              </div>
+              {msg.role === 'user' && (
+                <div className="avatar user-avatar">🧑‍💼</div>
+              )}
+            </div>
           ))}
 
-          <label className="field full">
-            <span>額外要求（可選）</span>
-            <textarea
-              rows={3}
-              value={extraInstructions}
-              onChange={(e) => setExtraInstructions(e.target.value)}
-              placeholder="例：語氣更簡潔、加入回條提醒、適用小四至小六"
-            />
-          </label>
-
-          <div className="actions full">
-            <button disabled={loading || !isReadyToGenerate} type="submit">
-              {loading ? '生成中...' : 'AI 生成通告'}
-            </button>
-          </div>
-        </form>
-      </section>
-
-      <section className="panel">
-        <h2>3. 校對與匯出 Word</h2>
-        {!notice && <p className="hint">請先在上方生成通告草稿。</p>}
-
-        {notice && (
-          <div className="grid-form">
-            <label className="field full">
-              <span>標題</span>
-              <input value={notice.title} onChange={(e) => updateNoticeField('title', e.target.value)} />
-            </label>
-
-            <label className="field full">
-              <span>收件人</span>
-              <input
-                value={notice.recipient}
-                onChange={(e) => updateNoticeField('recipient', e.target.value)}
-              />
-            </label>
-
-            <label className="field full">
-              <span>正文</span>
-              <textarea
-                rows={12}
-                value={notice.body}
-                onChange={(e) => updateNoticeField('body', e.target.value)}
-              />
-            </label>
-
-            <label className="field full">
-              <span>落款</span>
-              <textarea
-                rows={3}
-                value={notice.closing}
-                onChange={(e) => updateNoticeField('closing', e.target.value)}
-              />
-            </label>
-
-            <div className="actions full">
-              <button disabled={loading || !templateId} onClick={handleExport} type="button">
-                {loading ? '處理中...' : '下載 Word (.docx)'}
-              </button>
+          {/* Notice Preview */}
+          {notice && (
+            <div className="notice-preview">
+              <div className="notice-preview-header">
+                <span>📄 通告草稿已生成 — 可直接編輯後下載</span>
+              </div>
+              <div className="notice-fields">
+                <label>
+                  <span>標題</span>
+                  <input value={notice.title} onChange={(e) => updateNotice('title', e.target.value)} />
+                </label>
+                <label>
+                  <span>收件人</span>
+                  <input value={notice.recipient} onChange={(e) => updateNotice('recipient', e.target.value)} />
+                </label>
+                <label>
+                  <span>正文</span>
+                  <textarea rows={10} value={notice.body} onChange={(e) => updateNotice('body', e.target.value)} />
+                </label>
+                <label>
+                  <span>落款</span>
+                  <textarea rows={3} value={notice.closing} onChange={(e) => updateNotice('closing', e.target.value)} />
+                </label>
+              </div>
+              <div className="notice-actions">
+                {statusMsg && <span className="status-msg">{statusMsg}</span>}
+                <button
+                  className="export-btn"
+                  disabled={exportLoading || !templateId}
+                  onClick={handleExport}
+                >
+                  {exportLoading ? '處理中⋯' : '⬇️ 下載 Word (.docx)'}
+                </button>
+              </div>
+              {!templateId && (
+                <p className="notice-hint">請先在左側選擇 Word 範本才可下載</p>
+              )}
             </div>
+          )}
+
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Quick reply chips */}
+        {chips.length > 0 && !loading && (
+          <div className="chips-row">
+            {chips.map((c) => (
+              <button key={c} className="chip" onClick={() => sendMessage(c)}>
+                {c}
+              </button>
+            ))}
           </div>
         )}
-      </section>
 
-      {message && <p className="status">{message}</p>}
-    </main>
+        {/* Input bar */}
+        <form
+          className="input-bar"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void sendMessage(input)
+          }}
+        >
+          <textarea
+            ref={inputRef}
+            className="chat-input"
+            placeholder="輸入訊息⋯⋯（Shift+Enter 換行，Enter 發送）"
+            rows={1}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                void sendMessage(input)
+              }
+            }}
+          />
+          <button type="submit" className="send-btn" disabled={loading || !input.trim()}>
+            {loading ? '⋯' : '➤'}
+          </button>
+        </form>
+      </main>
+    </div>
   )
 }
 
-export default App
