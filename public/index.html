@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>學校通告生成器 · 基慈小學</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green:#0f766e;--green-d:#0d6460;--green-l:#ccfbf1;
+  --blue:#1a56db;--blue-l:#e8f0fe;
+  --bg:#f0f6f4;--border:#d1e8e2;
+  --text:#111827;--muted:#4b7a72;
+  --bubble-bot:#fff;--bubble-user:#0f766e;
+  --sidebar-w:230px;
+}
+html,body{height:100%;font-family:"Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif;background:var(--bg);color:var(--text)}
+#root{display:flex;height:100dvh;overflow:hidden}
+
+/* ── Sidebar ── */
+.sidebar{
+  width:var(--sidebar-w);flex-shrink:0;
+  background:linear-gradient(160deg,#073b4c,#0f766e);
+  color:#e0f2ef;padding:18px 14px;
+  display:flex;flex-direction:column;gap:16px;overflow-y:auto;
+}
+.sb-logo{display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.15)}
+.sb-logo img{width:40px;height:40px;object-fit:contain;background:rgba(255,255,255,.15);border-radius:8px;padding:3px}
+.sb-logo h1{font-size:.95rem;line-height:1.3;font-weight:700}
+.sb-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;opacity:.7;margin-bottom:4px}
+.sb-input{
+  width:100%;font:inherit;font-size:.88rem;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);
+  border-radius:7px;padding:7px 10px;color:#fff;
+}
+.sb-input option{background:#073b4c}
+.sb-hint{font-size:.72rem;opacity:.55;margin-top:3px}
+.reset-btn{
+  font:inherit;font-size:.85rem;cursor:pointer;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);
+  border-radius:99px;color:#fff;padding:7px 12px;text-align:left;
+  transition:background .15s;
+}
+.reset-btn:hover{background:rgba(255,255,255,.2)}
+.sb-mode{display:flex;gap:6px;flex-wrap:wrap}
+.mode-btn{
+  font:inherit;font-size:.78rem;cursor:pointer;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);
+  border-radius:99px;color:rgba(255,255,255,.8);padding:5px 10px;
+  transition:background .15s,color .15s;
+}
+.mode-btn.active,.mode-btn:hover{background:rgba(255,255,255,.22);color:#fff}
+.sb-footer{margin-top:auto;font-size:.7rem;opacity:.4;line-height:1.7}
+
+/* ── Chat main ── */
+.chat-main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+
+/* ── Messages ── */
+.msgs{flex:1;overflow-y:auto;padding:18px 14px 8px;display:flex;flex-direction:column;gap:10px}
+.msg-row{display:flex;align-items:flex-end;gap:7px;max-width:700px}
+.msg-row.bot{align-self:flex-start}
+.msg-row.user{align-self:flex-end;flex-direction:row-reverse}
+.avatar{font-size:1.2rem;flex-shrink:0;line-height:1;padding-bottom:1px}
+.bubble{
+  padding:10px 14px;border-radius:16px;
+  line-height:1.6;font-size:.93rem;word-break:break-word;
+  white-space:pre-wrap;box-shadow:0 2px 6px rgba(0,0,0,.07);
+  max-width:560px;
+}
+.bubble.bot{background:var(--bubble-bot);border:1px solid var(--border);border-bottom-left-radius:4px;color:var(--text)}
+.bubble.user{background:var(--bubble-user);color:#fff;border-bottom-right-radius:4px}
+.bubble.typing{padding:14px 18px}
+.dots{display:inline-flex;gap:5px}
+.dots span{width:7px;height:7px;background:#8ab4ad;border-radius:50%;animation:blink 1.2s infinite}
+.dots span:nth-child(2){animation-delay:.2s}
+.dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+
+/* ── Notice preview ── */
+.notice-card{
+  background:#fff;border:2px solid var(--green);border-radius:14px;
+  padding:18px;margin:6px 0;
+  box-shadow:0 4px 14px rgba(15,118,110,.12);
+  animation:slide-up .3s ease-out;
+}
+@keyframes slide-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.nc-header{font-weight:700;color:var(--green);margin-bottom:14px;font-size:.9rem}
+.nc-fields{display:flex;flex-direction:column;gap:10px}
+.nc-fields label{display:flex;flex-direction:column;gap:4px}
+.nc-fields label span{font-size:.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.nc-fields input,.nc-fields textarea{
+  font:inherit;font-size:.88rem;border:1px solid var(--border);border-radius:7px;
+  padding:8px 10px;background:var(--bg);color:var(--text);resize:vertical;
+}
+.nc-fields textarea{min-height:110px}
+.nc-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.nc-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:14px;flex-wrap:wrap}
+.nc-hint{font-size:.78rem;color:#c05000;margin-top:6px}
+.status-msg{font-size:.82rem;color:var(--muted)}
+
+/* ── Chips ── */
+.chips{display:flex;flex-wrap:wrap;gap:7px;padding:5px 14px 3px}
+.chip{
+  font:inherit;font-size:.85rem;cursor:pointer;
+  background:#fff;border:1.5px solid var(--green);color:var(--green);
+  border-radius:99px;padding:5px 13px;white-space:nowrap;
+  transition:background .13s,color .13s;
+}
+.chip:hover{background:var(--green);color:#fff}
+
+/* ── Input bar ── */
+.input-bar{display:flex;align-items:flex-end;gap:8px;padding:8px 14px 12px;background:#fff;border-top:1px solid var(--border)}
+.chat-in{
+  flex:1;font:inherit;font-size:.92rem;
+  border:1.5px solid var(--border);border-radius:14px;
+  padding:9px 12px;resize:none;line-height:1.5;
+  color:var(--text);background:var(--bg);max-height:130px;overflow-y:auto;
+  transition:border-color .13s;
+}
+.chat-in:focus{outline:none;border-color:var(--green)}
+.send-btn{
+  width:40px;height:40px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--green),#073b4c);
+  color:#fff;border:0;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:1.05rem;
+  transition:transform .13s,filter .13s;
+}
+.send-btn:hover:not(:disabled){transform:scale(1.08);filter:brightness(1.1)}
+.send-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── Buttons ── */
+.btn{
+  font:inherit;border:0;border-radius:7px;padding:9px 18px;cursor:pointer;
+  font-size:.88rem;font-weight:600;transition:background .13s,transform .1s;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn:active{transform:scale(.97)}
+.btn-dl{background:var(--green);color:#fff;font-size:.92rem;padding:10px 22px}
+.btn-dl:hover{background:var(--green-d)}
+.btn-dl:disabled{background:#6ee7b7;cursor:not-allowed}
+.btn-ghost{background:transparent;border:1.5px solid var(--border);color:var(--muted)}
+.btn-ghost:hover{background:var(--bg)}
+
+/* ── Toast ── */
+#toast{
+  position:fixed;bottom:20px;right:20px;
+  background:#1f2937;color:#fff;padding:10px 18px;
+  border-radius:8px;font-size:.88rem;opacity:0;pointer-events:none;
+  transition:opacity .3s;max-width:300px;z-index:999;
+}
+#toast.show{opacity:1}
+#toast.ok{background:var(--green)}
+#toast.err{background:#dc2626}
+.spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Form mode (hidden by default) ── */
+#formMode{display:none;flex:1;overflow-y:auto;padding:16px}
+#formMode.active{display:block}
+#chatMode{display:flex;flex-direction:column;flex:1;overflow:hidden}
+#chatMode.hidden{display:none}
+
+/* ── Responsive ── */
+@media(max-width:640px){
+  :root{--sidebar-w:180px}
+  .sb-logo h1{font-size:.82rem}
+  .bubble{max-width:calc(100vw - 130px)}
+}
+@media(max-width:420px){
+  #root{flex-direction:column}
+  .sidebar{width:100%;flex-direction:row;flex-wrap:wrap;padding:10px 12px;gap:8px;max-height:120px}
+  .sb-footer{display:none}
+}
+</style>
+</head>
+<body>
+<div id="root">
+
+<!-- ── Sidebar ───────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="sb-logo">
+    <img src="logo.png" alt="校徽">
+    <h1>學校通告<br>生成器</h1>
+  </div>
+
+  <div>
+    <div class="sb-label">學校名稱</div>
+    <input class="sb-input" id="schoolName" value="中華基督教會基慈小學">
+  </div>
+
+  <div>
+    <div class="sb-label">模式</div>
+    <div class="sb-mode">
+      <button class="mode-btn active" id="btnChat" onclick="switchMode('chat')">💬 助手</button>
+      <button class="mode-btn" id="btnForm" onclick="switchMode('form')">📋 表格</button>
+    </div>
+  </div>
+
+  <button class="reset-btn" onclick="resetChat()">🔄 重新開始</button>
+
+  <div class="sb-footer">中華基督教會基慈小學<br>學校行政工具</div>
+</aside>
+
+<!-- ── Chat mode ──────────────────────────────────────────────── -->
+<div id="chatMode">
+  <div class="msgs" id="msgs"></div>
+
+  <div class="chips" id="chips"></div>
+
+  <form class="input-bar" id="chatForm" onsubmit="sendMsg(event)">
+    <textarea class="chat-in" id="chatIn" rows="1"
+      placeholder="輸入訊息⋯⋯（Enter 發送，Shift+Enter 換行）"
+      onkeydown="handleKey(event)"></textarea>
+    <button type="submit" class="send-btn" id="sendBtn" disabled>➤</button>
+  </form>
+</div>
+
+<!-- ── Form mode ─────────────────────────────────────────────── -->
+<div id="formMode">
+  <!-- Injected from original form content below -->
+  <div id="formContent"></div>
+</div>
+
+</div>
+<div id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────
+const state = {
+  messages: [],
+  notice: null,
+  loading: false,
+};
+
+const WELCOME = '你好！👋 我係**通告小幫手**，幫你快速生成各類香港學校通告。\n\n你今次想出邊種通告呢？';
+const NOTICE_TYPES = ['活動通告','家長通告','考試測驗通知','繳費通知','緊急通告','其他通告'];
+
+// ── Init ───────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  addBotMsg(WELCOME);
+  setChips(NOTICE_TYPES);
+  document.getElementById('chatIn').addEventListener('input', onInputChange);
+  loadFormContent();
+});
+
+function onInputChange() {
+  const v = document.getElementById('chatIn').value.trim();
+  document.getElementById('sendBtn').disabled = !v || state.loading;
+}
+
+// ── Mode switch ────────────────────────────────────────────────
+function switchMode(mode) {
+  document.getElementById('chatMode').classList.toggle('hidden', mode !== 'chat');
+  document.getElementById('formMode').classList.toggle('active', mode === 'form');
+  document.getElementById('btnChat').classList.toggle('active', mode === 'chat');
+  document.getElementById('btnForm').classList.toggle('active', mode === 'form');
+}
+
+// ── Chat ───────────────────────────────────────────────────────
+function sendMsg(e) {
+  if (e) e.preventDefault();
+  const inp = document.getElementById('chatIn');
+  const text = inp.value.trim();
+  if (!text || state.loading) return;
+  inp.value = '';
+  onInputChange();
+  doSend(text);
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+}
+
+async function doSend(text) {
+  addUserMsg(text);
+  setChips([]);
+  state.messages.push({ role: 'user', content: text });
+  state.notice = null;
+
+  // Remove old notice preview if any
+  document.querySelectorAll('.notice-card').forEach(el => el.remove());
+
+  const typingId = addTyping();
+  state.loading = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: state.messages,
+        school_name: document.getElementById('schoolName').value.trim() || '中華基督教會基慈小學',
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '發生錯誤');
+
+    removeTyping(typingId);
+    addBotMsg(data.reply);
+    state.messages.push({ role: 'assistant', content: data.reply });
+
+    if (data.status === 'generated' && data.notice) {
+      state.notice = data.notice;
+      renderNoticeCard(data.notice);
+    }
+    setChips(data.suggestedReplies || []);
+  } catch (err) {
+    removeTyping(typingId);
+    addBotMsg('❌ 出錯了：' + err.message);
+  } finally {
+    state.loading = false;
+    onInputChange();
+    document.getElementById('chatIn').focus();
+  }
+}
+
+// ── Messages ───────────────────────────────────────────────────
+let _id = 0;
+function addBotMsg(text) {
+  const row = msgRow('bot', md(text));
+  document.getElementById('msgs').appendChild(row);
+  scrollBottom();
+  return row;
+}
+function addUserMsg(text) {
+  const row = msgRow('user', esc(text));
+  document.getElementById('msgs').appendChild(row);
+  scrollBottom();
+}
+function addTyping() {
+  const id = 'typing-' + (++_id);
+  const row = document.createElement('div');
+  row.className = 'msg-row bot'; row.id = id;
+  row.innerHTML = '<div class="avatar">🤖</div><div class="bubble bot typing"><span class="dots"><span></span><span></span><span></span></span></div>';
+  document.getElementById('msgs').appendChild(row);
+  scrollBottom();
+  return id;
+}
+function removeTyping(id) {
+  document.getElementById(id)?.remove();
+}
+function msgRow(role, htmlContent) {
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + role;
+  const avatar = role === 'bot' ? '🤖' : '🧑‍💼';
+  if (role === 'bot') {
+    row.innerHTML = `<div class="avatar">${avatar}</div><div class="bubble ${role}">${htmlContent}</div>`;
+  } else {
+    row.innerHTML = `<div class="bubble ${role}">${htmlContent}</div><div class="avatar">${avatar}</div>`;
+  }
+  return row;
+}
+function scrollBottom() {
+  const msgs = document.getElementById('msgs');
+  setTimeout(() => msgs.scrollTop = msgs.scrollHeight, 50);
+}
+
+// ── Chips ──────────────────────────────────────────────────────
+function setChips(list) {
+  const c = document.getElementById('chips');
+  c.innerHTML = '';
+  list.forEach(label => {
+    const btn = document.createElement('button');
+    btn.className = 'chip';
+    btn.textContent = label;
+    btn.onclick = () => { if (!state.loading) doSend(label); };
+    c.appendChild(btn);
+  });
+}
+
+// ── Notice card ────────────────────────────────────────────────
+function renderNoticeCard(n) {
+  const card = document.createElement('div');
+  card.className = 'notice-card';
+  card.innerHTML = `
+    <div class="nc-header">📄 通告草稿已生成 — 可直接編輯後下載</div>
+    <div class="nc-fields">
+      <div class="nc-meta">
+        <label><span>學年</span><input id="nc-sy" value="${esc(n['學年']||'')}"></label>
+        <label><span>通告編號</span><input id="nc-no" value="${esc(n['通告編號']||'XXXXX')}"></label>
+        <label><span>發出日期</span><input id="nc-date" value="${esc(n['發出日期']||'')}"></label>
+      </div>
+      <label><span>標題</span><input id="nc-title" value="${esc(n.title||'')}"></label>
+      <label><span>收件人</span><input id="nc-rec" value="${esc(n.recipient||'各位家長')}"></label>
+      <label><span>正文</span><textarea id="nc-body" rows="10">${esc(n.body||'')}</textarea></label>
+      <label><span>落款</span><textarea id="nc-close" rows="3">${esc(n.closing||'')}</textarea></label>
+    </div>
+    <div class="nc-actions">
+      <span class="status-msg" id="nc-status"></span>
+      <button class="btn btn-ghost" onclick="copyNotice()">📋 複製</button>
+      <button class="btn btn-dl" id="btnDL" onclick="downloadDocx()">⬇️ 下載 .docx</button>
+    </div>`;
+  document.getElementById('msgs').appendChild(card);
+  scrollBottom();
+}
+
+async function downloadDocx() {
+  const btn = document.getElementById('btnDL');
+  const status = document.getElementById('nc-status');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> 生成中…';
+  status.textContent = '';
+  try {
+    const payload = {
+      title:     document.getElementById('nc-title').value,
+      recipient: document.getElementById('nc-rec').value,
+      body:      document.getElementById('nc-body').value,
+      closing:   document.getElementById('nc-close').value,
+      '學年':    document.getElementById('nc-sy').value,
+      '通告編號':document.getElementById('nc-no').value,
+      '發出日期':document.getElementById('nc-date').value,
+      schoolName:document.getElementById('schoolName').value || '中華基督教會基慈小學',
+    };
+    const res = await fetch('/api/generate-notice', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) { const j = await res.json(); throw new Error(j.error||'失敗'); }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (payload.title||'學校通告') + '.docx';
+    a.click();
+    status.textContent = '✅ 已下載';
+  } catch (err) {
+    status.textContent = '❌ ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '⬇️ 下載 .docx';
+  }
+}
+
+function copyNotice() {
+  const title   = document.getElementById('nc-title')?.value || '';
+  const rec     = document.getElementById('nc-rec')?.value || '';
+  const body    = document.getElementById('nc-body')?.value || '';
+  const closing = document.getElementById('nc-close')?.value || '';
+  const text    = [title, rec + '，', '', body, '', closing].join('\n');
+  navigator.clipboard.writeText(text).then(() => toast('已複製到剪貼板', 'ok'));
+}
+
+// ── Reset ──────────────────────────────────────────────────────
+function resetChat() {
+  state.messages = [];
+  state.notice = null;
+  document.getElementById('msgs').innerHTML = '';
+  document.getElementById('chips').innerHTML = '';
+  addBotMsg(WELCOME);
+  setChips(NOTICE_TYPES);
+  document.getElementById('chatIn').value = '';
+  onInputChange();
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function md(s) {
+  return esc(s).replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+}
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show ' + type;
+  clearTimeout(t._t); t._t = setTimeout(()=>t.className='', 3000);
+}
+
+// ── Load original form ─────────────────────────────────────────
+function loadFormContent() {
+  document.getElementById('formContent').innerHTML = FORM_HTML;
+  // Re-attach scripts
+  const s = document.createElement('script');
+  s.textContent = FORM_SCRIPT;
+  document.getElementById('formContent').appendChild(s);
+}
+
+// Original form HTML (activity notice form)
+const FORM_HTML = `
+<style>
+#formContent{max-width:800px;margin:0 auto;padding:0 0 60px}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.card-title{font-size:.8rem;font-weight:700;color:#1a56db;text-transform:uppercase;letter-spacing:.06em;margin-bottom:16px;padding-bottom:8px;border-bottom:2px solid #e8f0fe}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid-1{display:grid;grid-template-columns:1fr;gap:14px}
+@media(max-width:520px){.grid-2{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:.82rem;font-weight:600;color:#374151}
+.req{color:#ef4444;margin-left:2px}
+.field input,.field textarea,.field select{border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px;font-size:.93rem;font-family:inherit;color:#111827;background:#fff;width:100%}
+.field textarea{resize:vertical;min-height:90px}
+.hint-txt{font-size:.75rem;color:#6b7280}
+.action-bar{display:flex;gap:12px;align-items:center;justify-content:flex-end;flex-wrap:wrap;margin-top:8px}
+.fbtn{display:inline-flex;align-items:center;gap:7px;border:none;border-radius:6px;padding:10px 20px;font-size:.92rem;font-weight:600;cursor:pointer;font-family:inherit}
+.fbtn-ai{background:#7c3aed;color:#fff}.fbtn-ai:hover{background:#6d28d9}.fbtn-ai:disabled{background:#a78bfa;cursor:not-allowed}
+.fbtn-dl{background:#0f766e;color:#fff;font-size:1rem;padding:12px 28px}.fbtn-dl:hover{background:#0d6460}.fbtn-dl:disabled{background:#6ee7b7;cursor:not-allowed}
+.upload-zone{border:2px dashed #e5e7eb;border-radius:8px;padding:24px 16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
+.upload-zone:hover,.upload-zone.drag{border-color:#1a56db;background:#e8f0fe}
+.upload-zone input[type=file]{display:none}
+.uz-icon{font-size:2rem;display:block;margin-bottom:6px}
+.uz-text{font-size:.88rem;color:#6b7280}
+.uz-name{font-size:.85rem;color:#1a56db;margin-top:6px;font-weight:600;min-height:1.2em;display:block}
+</style>
+<div style="padding:16px 0 0">
+<div class="card">
+  <div class="card-title">📎 從 PDF 通告提取欄位</div>
+  <div class="upload-zone" id="uploadZone2"
+       ondragover="event.preventDefault();this.classList.add('drag')"
+       ondragleave="this.classList.remove('drag')"
+       ondrop="handleDrop2(event)">
+    <label for="pdfInput2">
+      <span class="uz-icon">📄</span>
+      <span class="uz-text">點擊選擇或拖放相關資料 PDF</span>
+      <span class="uz-name" id="pdfName2"></span>
+    </label>
+    <input type="file" id="pdfInput2" accept=".pdf" onchange="onPdfFileChange2(this)">
+  </div>
+  <div style="margin-top:12px;display:flex;justify-content:flex-end">
+    <button type="button" class="fbtn fbtn-ai" id="btnPDF2" onclick="extractFromPDF2()" disabled>
+      <span>🤖</span> AI 提取欄位
+    </button>
+  </div>
+</div>
+<form id="form2">
+<div class="card">
+  <div class="card-title">基本資料</div>
+  <div class="grid-2">
+    <div class="field"><label>學年<span class="req">*</span></label><input name="學年" placeholder="例：2025/26" required></div>
+    <div class="field"><label>通告編號<span class="req">*</span></label><input name="通告編號" value="XXXXX"></div>
+    <div class="field"><label>活動名稱<span class="req">*</span></label><input name="活動名稱" placeholder="例：2026 機械人比賽"></div>
+    <div class="field"><label>發出日期</label><input name="發出日期" placeholder="例：10-5-2026" onblur="normDate2(this)"></div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-title">活動詳情</div>
+  <div class="grid-2">
+    <div class="field"><label>活動日期</label><input name="活動日期" placeholder="例：25-6-2026 (星期四)" onblur="normDate2(this)"></div>
+    <div class="field"><label>活動時間</label><input name="活動時間" placeholder="例：上午9:00至下午1:00"></div>
+    <div class="field" style="grid-column:1/-1"><label>活動地點</label><input name="活動地點" placeholder="例：香港科學館"></div>
+    <div class="field"><label>集合時間</label><input name="集合時間" placeholder="例：上午8:30"></div>
+    <div class="field"><label>集合地點</label><input name="集合地點" placeholder="例：學校正門"></div>
+    <div class="field" style="grid-column:1/-1"><label>解散時間及地點</label><input name="解散時間及地點" placeholder="例：約下午1:00於學校正門解散"></div>
+    <div class="field"><label>領隊老師</label><input name="領隊老師" placeholder="例：陳大文老師"></div>
+    <div class="field"><label>聯絡電話</label><input name="聯絡電話" value="2322 5122"></div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-title">活動簡介</div>
+  <div class="grid-1">
+    <div class="field"><label>活動簡介（AI 可自動生成）</label>
+      <textarea name="活動簡介" rows="3" placeholder="例：為了培育同學對科學的興趣，本校現誠邀相關同學參加「STEM博覽2026」"></textarea>
+      <span class="hint-txt">模板已在結尾加上「，詳情如下：」，此處不需再填寫</span></div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-title">備註</div>
+  <div class="grid-1">
+    <div class="field"><label>備註（AI 可自動分行格式化）</label>
+      <textarea name="備註" rows="5" placeholder="例：整齊學校文化校服 需自備文具 如有身體不適請即通知領隊老師"></textarea>
+      <span class="hint-txt">可輸入整段文字，按「AI 優化語句」後自動拆分為條列式備註</span></div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-title">回條資料</div>
+  <div class="grid-2">
+    <div class="field"><label>回條截止日期（表格用）</label><input name="回條截止日期" placeholder="例：15-5-2026" onblur="normDate2(this)"></div>
+    <div class="field"><label>回條截止（文字說明）</label><input name="回條截止（文字）" placeholder="例：15/5(星期五)"></div>
+  </div>
+</div>
+<div class="action-bar">
+  <button type="button" class="fbtn fbtn-ai" id="btnAI2" onclick="aiEnhance2()"><span>🤖</span> AI 優化語句</button>
+  <button type="button" class="fbtn fbtn-dl" id="btnDL2" onclick="generate2()"><span>📄</span> 下載通告 .docx</button>
+</div>
+</form>
+</div>`;
+
+const FORM_SCRIPT = `
+const form2 = document.getElementById('form2');
+function getFields2(){const d={};form2.querySelectorAll('input,textarea').forEach(el=>{if(el.name)d[el.name]=el.value.trim()});return d;}
+function setFields2(obj){for(const[k,v]of Object.entries(obj)){const el=form2.querySelector('[name="'+k+'"]');if(el&&v)el.value=v;}}
+function normDate2(inp){const raw=inp.value.trim();if(!raw)return;inp.value=raw.replace(/(\\d{1,4})[\\/.-](\\d{1,2})[\\/.-](\\d{2,4})/g,(_,a,b,c)=>{let d,mo,y;if(c.length===4){d=parseInt(a);mo=parseInt(b);y=parseInt(c);}else{d=parseInt(a);mo=parseInt(b);y=parseInt(c);if(y<100)y+=2000;}return isNaN(d)||isNaN(mo)||isNaN(y)?_:d+'-'+mo+'-'+y;});}
+async function aiEnhance2(){const btn=document.getElementById('btnAI2');btn.disabled=true;btn.innerHTML='<span class="spin"></span> AI 處理中…';try{const fields=getFields2();if(!fields['活動名稱']){toast('請先填寫活動名稱','err');return;}const res=await fetch('/api/ai-enhance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(fields)});const json=await res.json();if(!res.ok)throw new Error(json.error||'AI 錯誤');setFields2(json);toast('✓ AI 優化完成，請檢查各欄位','ok');}catch(e){toast('❌ '+e.message,'err');}finally{btn.disabled=false;btn.innerHTML='<span>🤖</span> AI 優化語句';}}
+async function generate2(){const fields=getFields2();if(!fields['活動名稱']||!fields['學年']){toast('請至少填寫「學年」及「活動名稱」','err');return;}const btn=document.getElementById('btnDL2');btn.disabled=true;btn.innerHTML='<span class="spin"></span> 生成中…';try{const res=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(fields)});if(!res.ok){const j=await res.json().catch(()=>({}));throw new Error(j.error||'伺服器錯誤');}const blob=await res.blob();const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(fields['活動名稱']||'學校通告')+'.docx';a.click();toast('✓ 通告已下載','ok');}catch(e){toast('❌ '+e.message,'err');}finally{btn.disabled=false;btn.innerHTML='<span>📄</span> 下載通告 .docx';}}
+function onPdfFileChange2(inp){const f=inp.files[0];document.getElementById('pdfName2').textContent=f?f.name:'';document.getElementById('btnPDF2').disabled=!f;}
+function handleDrop2(e){e.preventDefault();document.getElementById('uploadZone2').classList.remove('drag');const f=e.dataTransfer.files[0];if(!f||!f.name.toLowerCase().endsWith('.pdf')){toast('請上傳 PDF 檔案','err');return;}const dt=new DataTransfer();dt.items.add(f);const inp=document.getElementById('pdfInput2');inp.files=dt.files;onPdfFileChange2(inp);}
+async function extractFromPDF2(){const file=document.getElementById('pdfInput2').files[0];if(!file)return toast('請先選擇 PDF','err');const btn=document.getElementById('btnPDF2');btn.disabled=true;btn.innerHTML='<span class="spin"></span> 讀取 PDF…';try{if(typeof pdfjsLib==='undefined')throw new Error('PDF.js 未載入');pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';const ab=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:ab}).promise;let text='';for(let i=1;i<=pdf.numPages;i++){const page=await pdf.getPage(i);const c=await page.getTextContent();text+=c.items.map(x=>x.str).join(' ')+'\n';}let payload;if(text.trim().length>50){payload={text};}else{btn.innerHTML='<span class="spin"></span> 渲染頁面…';const imgs=[];const n=Math.min(pdf.numPages,3);for(let i=1;i<=n;i++){const page=await pdf.getPage(i);const vp=page.getViewport({scale:1.8});const cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;imgs.push(cv.toDataURL('image/png').split(',')[1]);}payload={images:imgs};}btn.innerHTML='<span class="spin"></span> AI 分析中…';const res=await fetch('/api/extract-pdf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const json=await res.json();if(!res.ok)throw new Error(json.error||'提取失敗');setFields2(json);toast('✓ 已提取 '+Object.keys(json).length+' 個欄位','ok');}catch(e){toast('❌ '+e.message,'err');}finally{btn.disabled=false;btn.innerHTML='<span>🤖</span> AI 提取欄位';}}
+`;
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</body>
+</html>
