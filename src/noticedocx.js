@@ -65,6 +65,28 @@ function rightPara(text) {
   </w:p>`;
 }
 
+/** Scissors cut line */
+function scissorLine() {
+  return `<w:p>
+    <w:pPr><w:jc w:val="center"/><w:spacing w:before="160" w:after="80"/></w:pPr>
+    <w:r>
+      <w:rPr><w:sz w:val="18"/><w:szCs w:val="18"/><w:rFonts w:east="標楷體" w:cs="標楷體"/></w:rPr>
+      <w:t xml:space="preserve">✂ - - - - - - - - - - - - - - - - - - - - - - - - -（請沿虛線剪下）- - - - - - - - - - - - - - - - - - - - - - - - -</w:t>
+    </w:r>
+  </w:p>`;
+}
+
+/** Single checkbox / reply item paragraph */
+function checkboxPara(text) {
+  return `<w:p>
+    <w:pPr><w:spacing w:before="60" w:after="60"/><w:ind w:left="360"/></w:pPr>
+    <w:r>
+      <w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/><w:rFonts w:east="標楷體" w:cs="標楷體"/></w:rPr>
+      <w:t xml:space="preserve">${esc(text)}</w:t>
+    </w:r>
+  </w:p>`;
+}
+
 /** Two-column row for notice meta (學年 / 通告編號) */
 function metaTable(schoolYear, noticeNo) {
   const cell = (text, align = 'left') =>
@@ -93,17 +115,38 @@ function metaTable(schoolYear, noticeNo) {
 
 /**
  * Build the word/document.xml content.
+ * Accepts both legacy fields {title, recipient, body, closing} and
+ * new structured fields {標題, 收件人, 正文, 回條標題, 回條項目, 回條截止日期}.
  */
 function buildDocumentXml(notice) {
-  const { title, recipient, body, closing, 學年, 通告編號, 發出日期, schoolName } = notice;
+  const schoolName   = notice.schoolName || '中華基督教會基慈小學';
+  const 學年         = notice['學年']   || '';
+  const 通告編號     = notice['通告編號'] || '';
+  const 發出日期     = notice['發出日期'] || '';
+  const title        = notice['標題']   || notice.title     || '學校通告';
+  const recipient    = notice['收件人'] || notice.recipient || '各位家長';
+  const body         = notice['正文']   || notice.body      || '';
+  const 回條標題     = notice['回條標題'] || '';
+  const 回條項目     = notice['回條項目'] || '';
+  const 回條截止日期 = notice['回條截止日期'] || '';
 
   const bodyParas = (body || '').split('\n\n')
     .flatMap(para => para.trim() ? [normalPara(para), emptyPara()] : [emptyPara()]);
 
-  const closingLines = (closing || '').split('\n').filter(Boolean);
-  const closingParas = closingLines.length
-    ? closingLines.map(l => rightPara(l)).join('\n')
-    : rightPara(closing || '');
+  const hasReplySlip = !!(回條標題 || 回條項目);
+  const replyItemParas = hasReplySlip
+    ? (回條項目 || '').split('\n').map(l => l.trim()).filter(Boolean)
+        .map(line => checkboxPara(line)).join('\n')
+    : '';
+
+  const replySlipSection = hasReplySlip ? `
+    ${scissorLine()}
+    ${回條截止日期 ? rightPara('截止日期：' + 回條截止日期) : ''}
+    ${centeredBoldPara(回條標題, '24')}
+    ${replyItemParas}
+    ${emptyPara()}
+    ${checkboxPara('學生姓名：___________________　　班別：_______　　家長簽署：___________________')}
+  ` : '';
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document
@@ -118,11 +161,11 @@ function buildDocumentXml(notice) {
           <w:b/><w:sz w:val="32"/><w:szCs w:val="32"/>
           <w:rFonts w:east="標楷體" w:cs="標楷體"/>
         </w:rPr>
-        <w:t>${esc(schoolName || '中華基督教會基慈小學')}</w:t>
+        <w:t>${esc(schoolName)}</w:t>
       </w:r>
     </w:p>
 
-    ${centeredBoldPara(title || '學校通告', '28')}
+    ${centeredBoldPara(title, '28')}
 
     ${metaTable(學年, 通告編號)}
 
@@ -132,7 +175,7 @@ function buildDocumentXml(notice) {
       <w:pPr><w:spacing w:before="60" w:after="60"/></w:pPr>
       <w:r>
         <w:rPr><w:sz w:val="24"/><w:szCs w:val="24"/><w:rFonts w:east="標楷體" w:cs="標楷體"/></w:rPr>
-        <w:t xml:space="preserve">${esc(recipient || '各位家長')}，</w:t>
+        <w:t xml:space="preserve">${esc(recipient)}，</w:t>
       </w:r>
     </w:p>
 
@@ -142,15 +185,20 @@ function buildDocumentXml(notice) {
 
     ${emptyPara()}
 
-    ${closingParas}
-
+    ${rightPara('此致')}
+    ${emptyPara()}
+    ${rightPara('校長謹啟')}
+    ${emptyPara()}
+    ${rightPara(schoolName + '　謹啟')}
     <w:p>
       <w:pPr><w:jc w:val="right"/><w:spacing w:before="60" w:after="60"/></w:pPr>
       <w:r>
         <w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/><w:rFonts w:east="標楷體" w:cs="標楷體"/></w:rPr>
-        <w:t xml:space="preserve">${esc(發出日期 || '')}</w:t>
+        <w:t xml:space="preserve">${esc(發出日期)}</w:t>
       </w:r>
     </w:p>
+
+    ${replySlipSection}
 
     <w:sectPr>
       <w:pgSz w:w="11906" w:h="16838"/>

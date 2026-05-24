@@ -595,6 +595,7 @@ function renderNoticeCard(n) {
   if (n.noticeType === 'activity') {
     // Structured activity notice — uses /api/generate (Word template)
     card.innerHTML = `
+      <input type="hidden" id="nc-type" value="activity">
       <div class="nc-header">📄 活動通告草稿已生成 — 可直接編輯後下載</div>
       <div class="nc-fields">
         <div class="nc-meta">
@@ -629,9 +630,36 @@ function renderNoticeCard(n) {
         <button class="btn btn-ghost" onclick="copyNotice()">📋 複製</button>
         <button class="btn btn-dl" id="btnDL" onclick="downloadDocx()">⬇️ 下載 .docx</button>
       </div>`;
-  } else {
-    // Plain-text notice — uses /api/generate-notice
+  } else if (n.noticeType === 'general') {
+    // General notice — uses /api/generate-notice with body + AI reply slip
     card.innerHTML = `
+      <input type="hidden" id="nc-type" value="general">
+      <div class="nc-header">📄 通告草稿已生成 — 可直接編輯後下載</div>
+      <div class="nc-fields">
+        <div class="nc-meta">
+          <label><span>學年</span><input id="nc-sy" value="${esc(n['學年']||'')}"></label>
+          <label><span>通告編號</span><input id="nc-no" value="${esc(n['通告編號']||'XXXXX')}"></label>
+          <label><span>發出日期</span><input id="nc-date" value="${esc(n['發出日期']||'')}"></label>
+        </div>
+        <label><span>標題</span><input id="nc-title" value="${esc(n['標題']||n.title||'')}"></label>
+        <label><span>收件人</span><input id="nc-rec" value="${esc(n['收件人']||n.recipient||'各位家長')}"></label>
+        <label><span>正文</span><textarea id="nc-body" rows="10">${esc(n['正文']||n.body||'')}</textarea></label>
+        <label><span>回條標題</span><input id="nc-reply-title" value="${esc(n['回條標題']||'')}"></label>
+        <label><span>回條項目（每行一項）</span><textarea id="nc-reply-items" rows="4">${esc(n['回條項目']||'')}</textarea></label>
+        <div class="nc-meta">
+          <label><span>回條截止日期</span><input id="nc-deadline" value="${esc(n['回條截止日期']||'')}"></label>
+          <label><span>回條截止（文字）</span><input id="nc-deadlinetext" value="${esc(n['回條截止（文字）']||'')}"></label>
+        </div>
+      </div>
+      <div class="nc-actions">
+        <span class="status-msg" id="nc-status"></span>
+        <button class="btn btn-ghost" onclick="copyNotice()">📋 複製</button>
+        <button class="btn btn-dl" id="btnDL" onclick="downloadDocx()">⬇️ 下載 .docx</button>
+      </div>`;
+  } else {
+    // Legacy plain-text notice (backward compat)
+    card.innerHTML = `
+      <input type="hidden" id="nc-type" value="plain">
       <div class="nc-header">📄 通告草稿已生成 — 可直接編輯後下載</div>
       <div class="nc-fields">
         <div class="nc-meta">
@@ -662,10 +690,10 @@ async function downloadDocx() {
   btn.innerHTML = '<span class="spin"></span> 生成中…';
   status.textContent = '';
   try {
-    const isActivity = !!document.getElementById('nc-actname');
+    const noticeType = document.getElementById('nc-type')?.value || 'plain';
     let res, filename;
 
-    if (isActivity) {
+    if (noticeType === 'activity') {
       // Activity notice — use template-based /api/generate
       const payload = {
         '學年':           document.getElementById('nc-sy').value,
@@ -691,8 +719,30 @@ async function downloadDocx() {
         body: JSON.stringify(payload),
       });
       filename = (payload['活動名稱'] || '活動通告') + '.docx';
+
+    } else if (noticeType === 'general') {
+      // General notice — use /api/generate-notice with structured fields
+      const payload = {
+        '學年':     document.getElementById('nc-sy').value,
+        '通告編號': document.getElementById('nc-no').value,
+        '發出日期': document.getElementById('nc-date').value,
+        '標題':     document.getElementById('nc-title').value,
+        '收件人':   document.getElementById('nc-rec').value,
+        '正文':     document.getElementById('nc-body').value,
+        '回條標題': document.getElementById('nc-reply-title').value,
+        '回條項目': document.getElementById('nc-reply-items').value,
+        '回條截止日期': document.getElementById('nc-deadline').value,
+        '回條截止（文字）': document.getElementById('nc-deadlinetext').value,
+        schoolName: '中華基督教會基慈小學',
+      };
+      res = await fetch('/api/generate-notice', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      filename = (payload['標題'] || '學校通告') + '.docx';
+
     } else {
-      // Plain-text notice — use /api/generate-notice
+      // Legacy plain-text notice
       const payload = {
         title:      document.getElementById('nc-title').value,
         recipient:  document.getElementById('nc-rec').value,
@@ -726,9 +776,9 @@ async function downloadDocx() {
 }
 
 function copyNotice() {
-  const isActivity = !!document.getElementById('nc-actname');
+  const noticeType = document.getElementById('nc-type')?.value || 'plain';
   let text;
-  if (isActivity) {
+  if (noticeType === 'activity') {
     const fields = [
       ['活動名稱', 'nc-actname'],
       ['活動日期', 'nc-actdate'],
@@ -748,6 +798,12 @@ function copyNotice() {
       })
       .filter(Boolean)
       .join('\n');
+  } else if (noticeType === 'general') {
+    const title   = document.getElementById('nc-title')?.value || '';
+    const rec     = document.getElementById('nc-rec')?.value || '';
+    const body    = document.getElementById('nc-body')?.value || '';
+    const items   = document.getElementById('nc-reply-items')?.value || '';
+    text = [title, rec + '，', '', body, items ? '\n--- 回條 ---\n' + items : ''].join('\n').trim();
   } else {
     const title   = document.getElementById('nc-title')?.value || '';
     const rec     = document.getElementById('nc-rec')?.value || '';

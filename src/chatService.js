@@ -11,12 +11,8 @@ const CHAT_SYSTEM_PROMPT = `你係「通告小幫手」，協助香港學校生�
 3. 資料齊備後，生成完整通告
 
 支援的通告類型：
-- 活動通告：見下方詳細欄位說明
-- 家長通告：主旨、對象年級、重要事項、回條截止（如有）、聯絡老師
-- 考試測驗通知：科目、日期時間、考試形式、範圍、注意事項
-- 繳費通知：項目、金額、截止日期、繳費方式
-- 緊急通告：事由、即時安排、家長須知、聯絡方法
-- 其他通告：主旨、詳細內容、注意事項
+- 活動通告：見下方「活動通告 fields 欄位」說明
+- 家長通告、考試測驗通知、繳費通知、緊急通告、其他通告：見下方「非活動通告 fields 欄位」說明
 
 活動通告 fields 欄位（必須使用以下確切欄位名稱）：
 - 活動名稱：比賽或活動的正式名稱（必填）
@@ -32,6 +28,14 @@ const CHAT_SYSTEM_PROMPT = `你係「通告小幫手」，協助香港學校生�
 - 備註：多項備註用換行分隔（一行一項，不加標點或符號開頭）
 - 回條截止日期：格式 D-M-YYYY（例 19-6-2026）
 - 回條截止（文字）：例 19/6(五)
+
+非活動通告 fields 欄位（必須使用以下確切欄位名稱）：
+- 標題：通告標題（簡潔，不超過20字）
+- 正文：完整通告正文（以「敬啟者：」開頭，段落之間用\n\n分隔，結尾「敬請　垂注，謝謝合作。」）
+- 回條標題：例 ＜2025/26年度XXXXX回條＞（用實際學年和通告編號）；如通告無需回條則設為空字串
+- 回條項目：回條選擇項目，每行一項以「☐」開頭（根據通告內容生成合適選項）；如無需回條設為空字串
+- 回條截止日期：格式 D-M-YYYY；如無需回條設為空字串
+- 回條截止（文字）：例 31/5(日)；如無需回條設為空字串
 
 必須收集的基本資料（所有類型）：
 - 學年（格式：2025/26）
@@ -177,12 +181,22 @@ export async function runChat(messages, schoolName, env, images = []) {
       };
     }
 
-    // For other notice types, call Qwen again to generate formatted plain text
-    const notice = await generateNoticeText(genData, schoolName, apiKey, baseUrl, textModel);
+    // For other notice types, return structured fields for /api/generate-notice
+    const f = genData.fields || {};
     return {
       reply: cleanReply,
       status: 'generated',
-      notice: { ...notice, ...baseFields },
+      notice: {
+        noticeType: 'general',
+        ...baseFields,
+        標題: f['標題'] || '',
+        收件人: genData.recipient || f['收件人'] || '各位家長',
+        正文: f['正文'] || '',
+        回條標題: f['回條標題'] || '',
+        回條項目: f['回條項目'] || '',
+        回條截止日期: f['回條截止日期'] || '',
+        '回條截止（文字）': f['回條截止（文字）'] || '',
+      },
       suggestedReplies: ['我想修改通告', '重新開始'],
     };
   }
