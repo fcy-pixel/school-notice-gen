@@ -206,6 +206,7 @@ export async function runChat(messages, schoolName, env, images = []) {
   }
 
   // Suggest quick replies based on context
+  const suggestedReplies = getSuggestedReplies(rawReply, messages);
   return { reply: cleanReply, status: 'collecting', suggestedReplies };
 }
 
