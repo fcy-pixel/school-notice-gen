@@ -24,11 +24,12 @@ function run(text, { underline = false, hint = 'eastAsia' } = {}) {
   return `<w:r><w:rPr><w:rFonts ${RF} ${CS_HK}${hintAttr}/>${uTag}</w:rPr><w:t xml:space="preserve">${text}</w:t></w:r>`;
 }
 
-/** Build a paragraph XML with given content and optional formatting */
-function para(inner, { spacing = 320, indent = null, jc = null } = {}) {
+/** Build a paragraph XML with given content and optional formatting.
+ *  Always include a w:rsidR attribute so expandMultiline can find it via '<w:p '. */
+function para(inner, { spacing = 320, indent = null, jc = null, id = '0000001' } = {}) {
   const indTag = indent ? `<w:ind ${indent}/>` : '';
   const jcTag = jc ? `<w:jc w:val="${jc}"/>` : '';
-  return `<w:p><w:pPr><w:snapToGrid w:val="0"/><w:spacing w:line="${spacing}" w:lineRule="exact"/>${indTag}${jcTag}<w:rPr><w:rFonts ${RF} ${CS_HK}/></w:rPr></w:pPr>${inner}</w:p>`;
+  return `<w:p w:rsidR="${id}"><w:pPr><w:snapToGrid w:val="0"/><w:spacing w:line="${spacing}" w:lineRule="exact"/>${indTag}${jcTag}<w:rPr><w:rFonts ${RF} ${CS_HK}/></w:rPr></w:pPr>${inner}</w:p>`;
 }
 
 async function main() {
@@ -81,20 +82,20 @@ async function main() {
 
   // Reply items ({{回條項目}} will be multi-line expanded) + blank + signature line
   const newReply = [
-    para(run('{{回條項目}}'), { jc: 'both' }),
-    para('', {}),
+    para(run('{{回條項目}}'), { jc: 'both', id: '0000002' }),
+    para('', { id: '0000003' }),
     // Signature line: 年級___班  學生姓名___  家長簽署___
-    `<w:p><w:pPr><w:snapToGrid w:val="0"/><w:spacing w:line="320" w:lineRule="exact"/><w:rPr><w:rFonts ${RF} ${CS_HK}/></w:rPr></w:pPr>` +
+    `<w:p w:rsidR="0000004"><w:pPr><w:snapToGrid w:val="0"/><w:spacing w:line="320" w:lineRule="exact"/><w:rPr><w:rFonts ${RF} ${CS_HK}/></w:rPr></w:pPr>` +
       run('　　年級') +
       run('　　　', { underline: true }) +
       run('班　　學生姓名') +
       run('　　　　　　　　', { underline: true }) +
       `</w:p>`,
-    `<w:p><w:pPr><w:snapToGrid w:val="0"/><w:spacing w:line="320" w:lineRule="exact"/><w:rPr><w:rFonts ${RF} ${CS_HK}/></w:rPr></w:pPr>` +
+    `<w:p w:rsidR="0000005"><w:pPr><w:snapToGrid w:val="0"/><w:spacing w:line="320" w:lineRule="exact"/><w:rPr><w:rFonts ${RF} ${CS_HK}/></w:rPr></w:pPr>` +
       run('　　家長簽署') +
       run('　　　　　　　　　　', { underline: true }) +
       `</w:p>`,
-    para('', {}),
+    para('', { id: '0000006' }),
   ].join('');
 
   doc = doc.slice(0, replyParaStart) + newReply + doc.slice(lastParaEnd);
