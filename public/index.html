@@ -591,24 +591,66 @@ function setChips(list) {
 function renderNoticeCard(n) {
   const card = document.createElement('div');
   card.className = 'notice-card';
-  card.innerHTML = `
-    <div class="nc-header">📄 通告草稿已生成 — 可直接編輯後下載</div>
-    <div class="nc-fields">
-      <div class="nc-meta">
-        <label><span>學年</span><input id="nc-sy" value="${esc(n['學年']||'')}"></label>
-        <label><span>通告編號</span><input id="nc-no" value="${esc(n['通告編號']||'XXXXX')}"></label>
-        <label><span>發出日期</span><input id="nc-date" value="${esc(n['發出日期']||'')}"></label>
+
+  if (n.noticeType === 'activity') {
+    // Structured activity notice — uses /api/generate (Word template)
+    card.innerHTML = `
+      <div class="nc-header">📄 活動通告草稿已生成 — 可直接編輯後下載</div>
+      <div class="nc-fields">
+        <div class="nc-meta">
+          <label><span>學年</span><input id="nc-sy" value="${esc(n['學年']||'')}"></label>
+          <label><span>通告編號</span><input id="nc-no" value="${esc(n['通告編號']||'XXXXX')}"></label>
+          <label><span>發出日期</span><input id="nc-date" value="${esc(n['發出日期']||'')}"></label>
+        </div>
+        <label><span>活動名稱</span><input id="nc-actname" value="${esc(n['活動名稱']||'')}"></label>
+        <label><span>活動簡介</span><textarea id="nc-intro" rows="2">${esc(n['活動簡介']||'')}</textarea></label>
+        <div class="nc-meta">
+          <label><span>活動日期</span><input id="nc-actdate" value="${esc(n['活動日期']||'')}"></label>
+          <label><span>活動時間</span><input id="nc-acttime" value="${esc(n['活動時間']||'')}"></label>
+        </div>
+        <label><span>活動地點</span><input id="nc-actplace" value="${esc(n['活動地點']||'')}"></label>
+        <div class="nc-meta">
+          <label><span>集合時間</span><input id="nc-meettime" value="${esc(n['集合時間']||'')}"></label>
+          <label><span>集合地點</span><input id="nc-meetplace" value="${esc(n['集合地點']||'')}"></label>
+        </div>
+        <label><span>解散時間及地點</span><input id="nc-dismiss" value="${esc(n['解散時間及地點']||'')}"></label>
+        <div class="nc-meta">
+          <label><span>領隊老師</span><input id="nc-teacher" value="${esc(n['領隊老師']||'')}"></label>
+          <label><span>聯絡電話</span><input id="nc-phone" value="${esc(n['聯絡電話']||'2322 5122')}"></label>
+        </div>
+        <label><span>備註（每行一項）</span><textarea id="nc-remarks" rows="4">${esc(n['備註']||'')}</textarea></label>
+        <div class="nc-meta">
+          <label><span>回條截止日期</span><input id="nc-deadline" value="${esc(n['回條截止日期']||'')}"></label>
+          <label><span>回條截止（文字）</span><input id="nc-deadlinetext" value="${esc(n['回條截止（文字）']||'')}"></label>
+        </div>
       </div>
-      <label><span>標題</span><input id="nc-title" value="${esc(n.title||'')}"></label>
-      <label><span>收件人</span><input id="nc-rec" value="${esc(n.recipient||'各位家長')}"></label>
-      <label><span>正文</span><textarea id="nc-body" rows="10">${esc(n.body||'')}</textarea></label>
-      <label><span>落款</span><textarea id="nc-close" rows="3">${esc(n.closing||'')}</textarea></label>
-    </div>
-    <div class="nc-actions">
-      <span class="status-msg" id="nc-status"></span>
-      <button class="btn btn-ghost" onclick="copyNotice()">📋 複製</button>
-      <button class="btn btn-dl" id="btnDL" onclick="downloadDocx()">⬇️ 下載 .docx</button>
-    </div>`;
+      <div class="nc-actions">
+        <span class="status-msg" id="nc-status"></span>
+        <button class="btn btn-ghost" onclick="copyNotice()">📋 複製</button>
+        <button class="btn btn-dl" id="btnDL" onclick="downloadDocx()">⬇️ 下載 .docx</button>
+      </div>`;
+  } else {
+    // Plain-text notice — uses /api/generate-notice
+    card.innerHTML = `
+      <div class="nc-header">📄 通告草稿已生成 — 可直接編輯後下載</div>
+      <div class="nc-fields">
+        <div class="nc-meta">
+          <label><span>學年</span><input id="nc-sy" value="${esc(n['學年']||'')}"></label>
+          <label><span>通告編號</span><input id="nc-no" value="${esc(n['通告編號']||'XXXXX')}"></label>
+          <label><span>發出日期</span><input id="nc-date" value="${esc(n['發出日期']||'')}"></label>
+        </div>
+        <label><span>標題</span><input id="nc-title" value="${esc(n.title||'')}"></label>
+        <label><span>收件人</span><input id="nc-rec" value="${esc(n.recipient||'各位家長')}"></label>
+        <label><span>正文</span><textarea id="nc-body" rows="10">${esc(n.body||'')}</textarea></label>
+        <label><span>落款</span><textarea id="nc-close" rows="3">${esc(n.closing||'')}</textarea></label>
+      </div>
+      <div class="nc-actions">
+        <span class="status-msg" id="nc-status"></span>
+        <button class="btn btn-ghost" onclick="copyNotice()">📋 複製</button>
+        <button class="btn btn-dl" id="btnDL" onclick="downloadDocx()">⬇️ 下載 .docx</button>
+      </div>`;
+  }
+
   document.getElementById('msgs').appendChild(card);
   scrollBottom();
 }
@@ -620,25 +662,59 @@ async function downloadDocx() {
   btn.innerHTML = '<span class="spin"></span> 生成中…';
   status.textContent = '';
   try {
-    const payload = {
-      title:     document.getElementById('nc-title').value,
-      recipient: document.getElementById('nc-rec').value,
-      body:      document.getElementById('nc-body').value,
-      closing:   document.getElementById('nc-close').value,
-      '學年':    document.getElementById('nc-sy').value,
-      '通告編號':document.getElementById('nc-no').value,
-      '發出日期':document.getElementById('nc-date').value,
-      schoolName:'中華基督教會基慈小學',
-    };
-    const res = await fetch('/api/generate-notice', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) { const j = await res.json(); throw new Error(j.error||'失敗'); }
+    const isActivity = !!document.getElementById('nc-actname');
+    let res, filename;
+
+    if (isActivity) {
+      // Activity notice — use template-based /api/generate
+      const payload = {
+        '學年':           document.getElementById('nc-sy').value,
+        '通告編號':       document.getElementById('nc-no').value,
+        '發出日期':       document.getElementById('nc-date').value,
+        '活動名稱':       document.getElementById('nc-actname').value,
+        '活動簡介':       document.getElementById('nc-intro').value,
+        '活動日期':       document.getElementById('nc-actdate').value,
+        '活動時間':       document.getElementById('nc-acttime').value,
+        '活動地點':       document.getElementById('nc-actplace').value,
+        '集合時間':       document.getElementById('nc-meettime').value,
+        '集合地點':       document.getElementById('nc-meetplace').value,
+        '解散時間及地點': document.getElementById('nc-dismiss').value,
+        '領隊老師':       document.getElementById('nc-teacher').value,
+        '聯絡電話':       document.getElementById('nc-phone').value,
+        '備註':           document.getElementById('nc-remarks').value,
+        '回條截止日期':   document.getElementById('nc-deadline').value,
+        '回條截止（文字）': document.getElementById('nc-deadlinetext').value,
+        schoolName: '中華基督教會基慈小學',
+      };
+      res = await fetch('/api/generate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      filename = (payload['活動名稱'] || '活動通告') + '.docx';
+    } else {
+      // Plain-text notice — use /api/generate-notice
+      const payload = {
+        title:      document.getElementById('nc-title').value,
+        recipient:  document.getElementById('nc-rec').value,
+        body:       document.getElementById('nc-body').value,
+        closing:    document.getElementById('nc-close').value,
+        '學年':     document.getElementById('nc-sy').value,
+        '通告編號': document.getElementById('nc-no').value,
+        '發出日期': document.getElementById('nc-date').value,
+        schoolName: '中華基督教會基慈小學',
+      };
+      res = await fetch('/api/generate-notice', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      filename = (payload.title || '學校通告') + '.docx';
+    }
+
+    if (!res.ok) { const j = await res.json(); throw new Error(j.error || '失敗'); }
     const blob = await res.blob();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = (payload.title||'學校通告') + '.docx';
+    a.download = filename;
     a.click();
     status.textContent = '✅ 已下載';
   } catch (err) {
@@ -650,11 +726,35 @@ async function downloadDocx() {
 }
 
 function copyNotice() {
-  const title   = document.getElementById('nc-title')?.value || '';
-  const rec     = document.getElementById('nc-rec')?.value || '';
-  const body    = document.getElementById('nc-body')?.value || '';
-  const closing = document.getElementById('nc-close')?.value || '';
-  const text    = [title, rec + '，', '', body, '', closing].join('\n');
+  const isActivity = !!document.getElementById('nc-actname');
+  let text;
+  if (isActivity) {
+    const fields = [
+      ['活動名稱', 'nc-actname'],
+      ['活動日期', 'nc-actdate'],
+      ['活動時間', 'nc-acttime'],
+      ['活動地點', 'nc-actplace'],
+      ['集合時間', 'nc-meettime'],
+      ['集合地點', 'nc-meetplace'],
+      ['解散時間及地點', 'nc-dismiss'],
+      ['領隊老師', 'nc-teacher'],
+      ['備註', 'nc-remarks'],
+      ['回條截止日期', 'nc-deadline'],
+    ];
+    text = fields
+      .map(([label, id]) => {
+        const v = document.getElementById(id)?.value?.trim();
+        return v ? `${label}：${v}` : '';
+      })
+      .filter(Boolean)
+      .join('\n');
+  } else {
+    const title   = document.getElementById('nc-title')?.value || '';
+    const rec     = document.getElementById('nc-rec')?.value || '';
+    const body    = document.getElementById('nc-body')?.value || '';
+    const closing = document.getElementById('nc-close')?.value || '';
+    text = [title, rec + '，', '', body, '', closing].join('\n');
+  }
   navigator.clipboard.writeText(text).then(() => toast('已複製到剪貼板', 'ok'));
 }
 

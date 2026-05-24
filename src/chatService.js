@@ -11,12 +11,27 @@ const CHAT_SYSTEM_PROMPT = `你係「通告小幫手」，協助香港學校生�
 3. 資料齊備後，生成完整通告
 
 支援的通告類型：
-- 活動通告：活動名稱、對象年級、日期時間、地點、費用（如有）、截止報名（如有）、注意事項
+- 活動通告：見下方詳細欄位說明
 - 家長通告：主旨、對象年級、重要事項、回條截止（如有）、聯絡老師
 - 考試測驗通知：科目、日期時間、考試形式、範圍、注意事項
 - 繳費通知：項目、金額、截止日期、繳費方式
 - 緊急通告：事由、即時安排、家長須知、聯絡方法
 - 其他通告：主旨、詳細內容、注意事項
+
+活動通告 fields 欄位（必須使用以下確切欄位名稱）：
+- 活動名稱：比賽或活動的正式名稱（必填）
+- 活動日期：格式 D-M-YYYY（例 2-7-2026）
+- 活動時間：例 上午11:30至下午1:00
+- 活動地點：完整地址（例 天主教伍華中學（香港新蒲崗彩虹道5號））
+- 集合時間：例 上午11:00
+- 集合地點：例 基慈小學正門
+- 解散時間及地點：例 下午1:30於基慈小學正門解散
+- 領隊老師：例 馮志遠主任
+- 聯絡電話：預設 2322 5122
+- 活動簡介：一至兩句描述活動目的，結尾不加「詳情如下：」
+- 備註：多項備註用換行分隔（一行一項，不加標點或符號開頭）
+- 回條截止日期：格式 D-M-YYYY（例 19-6-2026）
+- 回條截止（文字）：例 19/6(五)
 
 必須收集的基本資料（所有類型）：
 - 學年（格式：2025/26）
@@ -129,17 +144,45 @@ export async function runChat(messages, schoolName, env, images = []) {
       return { reply: cleanReply, status: 'collecting', suggestedReplies: [] };
     }
 
-    // Call Qwen again to generate the formatted notice text
+    const baseFields = {
+      學年: genData['學年'] || '',
+      通告編號: genData['通告編號'] || 'XXXXX',
+      發出日期: genData['發出日期'] || today,
+    };
+
+    // For activity notices, return structured fields for /api/generate (template-based, full format)
+    if (genData.noticeType === '活動通告') {
+      const f = genData.fields || {};
+      return {
+        reply: cleanReply,
+        status: 'generated',
+        notice: {
+          noticeType: 'activity',
+          ...baseFields,
+          活動名稱: f['活動名稱'] || '',
+          活動日期: f['活動日期'] || '',
+          活動時間: f['活動時間'] || '',
+          活動地點: f['活動地點'] || '',
+          集合時間: f['集合時間'] || '',
+          集合地點: f['集合地點'] || '',
+          解散時間及地點: f['解散時間及地點'] || '',
+          領隊老師: f['領隊老師'] || '',
+          聯絡電話: f['聯絡電話'] || '2322 5122',
+          活動簡介: f['活動簡介'] || '',
+          備註: f['備註'] || '',
+          回條截止日期: f['回條截止日期'] || '',
+          '回條截止（文字）': f['回條截止（文字）'] || '',
+        },
+        suggestedReplies: ['我想修改通告', '重新開始'],
+      };
+    }
+
+    // For other notice types, call Qwen again to generate formatted plain text
     const notice = await generateNoticeText(genData, schoolName, apiKey, baseUrl, textModel);
     return {
       reply: cleanReply,
       status: 'generated',
-      notice: {
-        ...notice,
-        學年: genData['學年'] || '',
-        通告編號: genData['通告編號'] || 'XXXXX',
-        發出日期: genData['發出日期'] || today,
-      },
+      notice: { ...notice, ...baseFields },
       suggestedReplies: ['我想修改通告', '重新開始'],
     };
   }
