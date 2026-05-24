@@ -1,15 +1,34 @@
-import { buildNoticeDocx } from '../../src/noticedocx.js';
+import { GENERAL_TEMPLATE_B64 } from '../../src/general-template-b64.js';
+import { fillTemplate } from '../../src/docx.js';
 
 /**
  * POST /api/generate-notice
- * Body: {title, recipient, body, closing, 學年, 通告編號, 發出日期, schoolName}
- * Returns: .docx file download
+ * Body: {標題, 收件人, 正文, 回條標題, 回條項目, 回條截止日期, 學年, 通告編號, 發出日期}
+ * Returns: .docx file download using the school-branded general notice template
  */
 export async function onRequestPost({ request }) {
   try {
     const notice = await request.json();
-    const docBytes = await buildNoticeDocx(notice);
-    const safeName = encodeURIComponent((notice.title || '學校通告') + '.docx');
+
+    // Decode template and fill placeholders
+    const bin = atob(GENERAL_TEMPLATE_B64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+    const fields = {
+      '學年':         notice['學年']         || '',
+      '通告編號':     notice['通告編號']     || 'XXXXX',
+      '發出日期':     notice['發出日期']     || '',
+      '標題':         notice['標題']         || notice.title || '',
+      '收件人':       notice['收件人']       || notice.recipient || '各位家長',
+      '正文':         notice['正文']         || notice.body  || '',
+      '回條標題':     notice['回條標題']     || '',
+      '回條項目':     notice['回條項目']     || '',
+      '回條截止日期': notice['回條截止日期'] || '',
+    };
+
+    const docBytes = await fillTemplate(bytes.buffer, fields);
+    const safeName = encodeURIComponent((fields['標題'] || '學校通告') + '.docx');
     return new Response(docBytes, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
