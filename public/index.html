@@ -650,6 +650,10 @@ function renderNoticeCard(n) {
           <label><span>回條截止日期</span><input id="nc-deadline" value="${esc(n['回條截止日期']||'')}"></label>
           <label><span>回條截止（文字）</span><input id="nc-deadlinetext" value="${esc(n['回條截止（文字）']||'')}"></label>
         </div>
+        <div class="nc-meta">
+          <label><span>聯絡電話</span><input id="nc-phone" value="${esc(n['聯絡電話']||'2322 5122')}"></label>
+          <label><span>聯絡老師</span><input id="nc-contactteacher" value="${esc(n['聯絡老師']||'')}"></label>
+        </div>
       </div>
       <div class="nc-actions">
         <span class="status-msg" id="nc-status"></span>
@@ -733,6 +737,8 @@ async function downloadDocx() {
         '回條項目': document.getElementById('nc-reply-items').value,
         '回條截止日期': document.getElementById('nc-deadline').value,
         '回條截止（文字）': document.getElementById('nc-deadlinetext').value,
+        '聯絡電話': document.getElementById('nc-phone').value,
+        '聯絡老師': document.getElementById('nc-contactteacher').value,
         schoolName: '中華基督教會基慈小學',
       };
       res = await fetch('/api/generate-notice', {

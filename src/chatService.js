@@ -36,6 +36,8 @@ const CHAT_SYSTEM_PROMPT = `你係「通告小幫手」，協助香港學校生�
 - 回條項目：回條選擇項目，每行一項以「☐」開頭（根據通告內容生成合適選項）；如無需回條設為空字串
 - 回條截止日期：格式 D-M-YYYY；如無需回條設為空字串
 - 回條截止（文字）：例 31/5(日)；如無需回條設為空字串
+- 聯絡電話：預設 2322 5122
+- 聯絡老師：例 鄧潔儀老師
 
 必須收集的基本資料（所有類型）：
 - 學年（格式：2025/26）
@@ -196,13 +198,14 @@ export async function runChat(messages, schoolName, env, images = []) {
         回條項目: f['回條項目'] || '',
         回條截止日期: f['回條截止日期'] || '',
         '回條截止（文字）': f['回條截止（文字）'] || '',
+        聯絡電話: f['聯絡電話'] || '2322 5122',
+        聯絡老師: f['聯絡老師'] || '',
       },
       suggestedReplies: ['我想修改通告', '重新開始'],
     };
   }
 
   // Suggest quick replies based on context
-  const suggestedReplies = getSuggestedReplies(rawReply, messages);
   return { reply: cleanReply, status: 'collecting', suggestedReplies };
 }
 

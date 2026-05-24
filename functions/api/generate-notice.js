@@ -25,6 +25,9 @@ export async function onRequestPost({ request }) {
       '回條標題':     notice['回條標題']     || '',
       '回條項目':     notice['回條項目']     || '',
       '回條截止日期': notice['回條截止日期'] || '',
+      '回條截止（文字）': notice['回條截止（文字）'] || '',
+      '聯絡電話':     notice['聯絡電話']     || '2322 5122',
+      '聯絡老師':     notice['聯絡老師']     || '',
     };
 
     const docBytes = await fillTemplate(bytes.buffer, fields);

@@ -55,12 +55,19 @@ async function main() {
   const paraBeforeBody = doc.lastIndexOf('<w:p ', bodyStartIdx);
   const paraBeforeEnd = doc.lastIndexOf('<w:p ', bodyEndIdx);
 
-  // New body: recipient line, blank, body text (multiline-expanded by fillTemplate)
+  // New body: recipient line, blank, body text, eClass contact line, blank
   const newBody = [
     para(run('{{收件人}}，'), { jc: 'both' }),
     para('', {}),
     para(run('{{正文}}'), { indent: 'w:firstLineChars="200" w:firstLine="480"', jc: 'both' }),
     para('', {}),
+    para(
+      run('請家長於') + run('{{回條截止（文字）}}') +
+      run('或之前使用eClass家長手機應用程式回覆此通告。如有任何查詢，可致電') +
+      run('{{聯絡電話}}') + run('與') + run('{{聯絡老師}}') + run('聯絡。'),
+      { jc: 'both', id: '0000007' }
+    ),
+    para('', { id: '0000008' }),
   ].join('');
 
   doc = doc.slice(0, paraBeforeBody) + newBody + doc.slice(paraBeforeEnd);
@@ -114,7 +121,7 @@ async function main() {
   console.log(`✓ Written ${newBytes.length} bytes → src/general-template-b64.js`);
 
   // Quick sanity check: verify key placeholders are still present
-  const check = ['{{標題}}', '{{收件人}}', '{{正文}}', '{{回條標題}}', '{{回條項目}}', '{{回條截止日期}}', '{{學年}}', '{{通告編號}}', '{{發出日期}}'];
+  const check = ['{{標題}}', '{{收件人}}', '{{正文}}', '{{回條標題}}', '{{回條項目}}', '{{回條截止日期}}', '{{回條截止（文字）}}', '{{聯絡電話}}', '{{聯絡老師}}', '{{學年}}', '{{通告編號}}', '{{發出日期}}'];
   for (const ph of check) {
     if (!doc.includes(ph)) console.warn(`  ⚠  Missing placeholder: ${ph}`);
     else console.log(`  ✓  ${ph}`);
